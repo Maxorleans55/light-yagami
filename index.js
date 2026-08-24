@@ -136,7 +136,7 @@ function getContentType(msg) {
 async function chatWithGemini(text) {
     if (!genAI) return null;
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const result = await model.generateContent(text);
         return result.response.text();
     } catch (e) {
