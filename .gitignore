@@ -1,0 +1,14 @@
+node_modules/
+auth_info/
+.env
+database.json
+logs/
+*.log
+.DS_Store
+Thumbs.db
+package-lock.json
+DSA-GroupProject/
+dcit208-client-project-2026-team-engineering-repository-seg26-03-school-m-system-1/
+issue_num.txt
+s6-err.log
+s6-out.log

@@ -1,0 +1,43 @@
+{
+  "name": "light-yagami",
+  "version": "1.0.0",
+  "description": "Light Yagami — Advanced WhatsApp Bot with AI Integration & Group Control",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "start:gc": "node --expose-gc index.js",
+    "start:low": "node --max-old-space-size=256 --optimize-for-size index.js",
+    "start:mid": "node --max-old-space-size=512 index.js",
+    "start:high": "node --max-old-space-size=1024 index.js",
+    "dev": "node --trace-warnings index.js",
+    "pm2": "pm2 start index.js --name Light-Yagami --no-daemon",
+    "pm2:stop": "pm2 stop Light-Yagami",
+    "pm2:restart": "pm2 restart Light-Yagami",
+    "install:deps": "npm install --legacy-peer-deps"
+  },
+  "keywords": [
+    "whatsapp-bot",
+    "baileys",
+    "light-yagami",
+    "ai-bot",
+    "group-control"
+  ],
+  "author": "Max Shadows",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "axios": "^1.7.9",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fs-extra": "^11.3.0",
+    "moment-timezone": "^0.5.46",
+    "node-cache": "^5.1.2",
+    "openai": "^4.77.0",
+    "pino": "^9.6.0",
+    "qrcode-terminal": "^0.12.0",
+    "wa-sticker-formatter": "^4.4.4"
+  }
+}
