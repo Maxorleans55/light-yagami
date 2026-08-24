@@ -762,6 +762,9 @@ async function startBot() {
             const sender = msg.key.participant || msg.key.remoteJid;
             const isGroup = chatId.endsWith('@g.us');
             
+            // Debug: Log received message
+            console.log(`[Message] From: ${sender}, Chat: ${chatId}`);
+            
             // Handle view once messages FIRST (before any other processing)
             await handleViewOnce(msg, sock);
             
@@ -777,9 +780,13 @@ async function startBot() {
                 messageText = msg.message.videoMessage.caption;
             }
             
+            // Debug: Log message text
+            console.log(`[Message Text] ${messageText}`);
+            
             // Check for commands
             if (messageText.startsWith(config.botPrefix)) {
                 const [command, ...args] = messageText.slice(config.botPrefix.length).trim().split(/\s+/);
+                console.log(`[Command] ${command} with args: ${args.join(' ')}`);
                 await handleCommand(sock, msg, command, args, loadDB());
                 continue;
             }
