@@ -176,37 +176,46 @@ async function getAIResponse(text) {
 // ============================================
 async function downloadTikTok(url) {
     try {
-        // Using a free TikTok API
-        const apiUrl = `https://api.tiklydown.me/api/download?url=${encodeURIComponent(url)}`;
-        const response = await axios.get(apiUrl, { timeout: 30000 });
+        // Try multiple APIs
+        const apis = [
+            `https://tikwm.com/api/?url=${encodeURIComponent(url)}`,
+            `https://api.douyin.wtf/api?url=${encodeURIComponent(url)}&minimal=true`
+        ];
         
-        if (response.data && response.data.success !== false) {
-            return {
-                success: true,
-                video: response.data.video?.download || response.data.video?.no_watermark,
-                author: response.data.author?.nickname || 'Unknown',
-                caption: response.data.title || '',
-                likes: response.data.stats?.likes || 0,
-                comments: response.data.stats?.comments || 0
-            };
+        for (const apiUrl of apis) {
+            try {
+                const response = await axios.get(apiUrl, { timeout: 30000 });
+                
+                // tikwm API
+                if (response.data && response.data.code === 0) {
+                    return {
+                        success: true,
+                        video: response.data.data?.play || response.data.data?.hdplay,
+                        author: response.data.data?.author?.nickname || 'Unknown',
+                        caption: response.data.data?.title || '',
+                        likes: response.data.data?.digg_count || 0,
+                        comments: response.data.data?.comment_count || 0
+                    };
+                }
+                
+                // douyin.wtf API
+                if (response.data && response.data.status === 'success') {
+                    return {
+                        success: true,
+                        video: response.data.data?.video?.download || response.data.data?.video?.play_addr,
+                        author: response.data.data?.author?.nickname || 'Unknown',
+                        caption: response.data.data?.desc || '',
+                        likes: response.data.data?.statistics?.digg_count || 0,
+                        comments: response.data.data?.statistics?.comment_count || 0
+                    };
+                }
+            } catch (e) {
+                console.log(`[TikTok] API failed: ${apiUrl}`);
+                continue;
+            }
         }
         
-        // Alternative API
-        const altApiUrl = `https://tikwm.com/api/?url=${encodeURIComponent(url)}`;
-        const altResponse = await axios.get(altApiUrl, { timeout: 30000 });
-        
-        if (altResponse.data && altResponse.data.code === 0) {
-            return {
-                success: true,
-                video: altResponse.data.data?.play,
-                author: altResponse.data.data?.author?.nickname || 'Unknown',
-                caption: altResponse.data.data?.title || '',
-                likes: altResponse.data.data?.digg_count || 0,
-                comments: altResponse.data.data?.comment_count || 0
-            };
-        }
-        
-        return { success: false, error: 'Could not fetch video' };
+        return { success: false, error: 'All APIs failed' };
     } catch (e) {
         console.error('TikTok Download Error:', e.message);
         return { success: false, error: e.message };
