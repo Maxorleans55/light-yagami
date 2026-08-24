@@ -16,6 +16,7 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs-extra');
 const path = require('path');
 const moment = require('moment-timezone');
+const axios = require('axios');
 require('dotenv').config();
 
 // ============================================
@@ -62,11 +63,22 @@ function loadDB() {
             return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
         }
     } catch (e) {}
-    return { users: {}, groups: {}, settings: {} };
+    return { users: {}, groups: {}, settings: { autoWatchStatus: false, autoLikeStatus: false } };
 }
 
 function saveDB(data) {
     fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+}
+
+function getUserSettings(db, userId) {
+    if (!db.users[userId]) {
+        db.users[userId] = {
+            autoWatchStatus: false,
+            autoLikeStatus: false,
+            joinedAt: Date.now()
+        };
+    }
+    return db.users[userId];
 }
 
 // ============================================
@@ -156,6 +168,54 @@ async function getAIResponse(text) {
         if (response) return response;
     }
     return 'AI services not configured. Add API key in .env';
+}
+
+// ============================================
+// TIKTOK DOWNLOADER
+// ============================================
+async function downloadTikTok(url) {
+    try {
+        // Using a free TikTok API
+        const apiUrl = `https://api.tiklydown.me/api/download?url=${encodeURIComponent(url)}`;
+        const response = await axios.get(apiUrl, { timeout: 30000 });
+        
+        if (response.data && response.data.success !== false) {
+            return {
+                success: true,
+                video: response.data.video?.download || response.data.video?.no_watermark,
+                author: response.data.author?.nickname || 'Unknown',
+                caption: response.data.title || '',
+                likes: response.data.stats?.likes || 0,
+                comments: response.data.stats?.comments || 0
+            };
+        }
+        
+        // Alternative API
+        const altApiUrl = `https://tikwm.com/api/?url=${encodeURIComponent(url)}`;
+        const altResponse = await axios.get(altApiUrl, { timeout: 30000 });
+        
+        if (altResponse.data && altResponse.data.code === 0) {
+            return {
+                success: true,
+                video: altResponse.data.data?.play,
+                author: altResponse.data.data?.author?.nickname || 'Unknown',
+                caption: altResponse.data.data?.title || '',
+                likes: altResponse.data.data?.digg_count || 0,
+                comments: altResponse.data.data?.comment_count || 0
+            };
+        }
+        
+        return { success: false, error: 'Could not fetch video' };
+    } catch (e) {
+        console.error('TikTok Download Error:', e.message);
+        return { success: false, error: e.message };
+    }
+}
+
+function extractTikTokUrl(text) {
+    const tiktokRegex = /(?:https?:\/\/)?(?:www\.|vm\.|vt\.)?(?:tiktok\.com\/@[^\s]+\/video\/\d+|tiktok\.com\/t\/[^\s]+|vm\.tiktok\.com\/[^\s]+)/gi;
+    const matches = text.match(tiktokRegex);
+    return matches ? matches[0] : null;
 }
 
 // ============================================
@@ -333,10 +393,21 @@ async function handleCommand(sock, msg, command, args, db) {
 ├ ${config.botPrefix}vv - Save view once media
 └ ${config.botPrefix}owner - Bot owner info
 
+📥 *Download Commands*
+├ ${config.botPrefix}tiktok <url> - Download TikTok video
+├ ${config.botPrefix}tt <url> - Download TikTok video
+└ Auto-detect TikTok links in chat
+
 🤖 *AI Commands*
 ├ ${config.botPrefix}ai <text> - Chat with AI
 ├ ${config.botPrefix}gpt <text> - ChatGPT
 └ ${config.botPrefix}gemini <text> - Gemini AI
+
+📱 *Status Commands*
+├ ${config.botPrefix}autowatch - Toggle auto watch status
+├ ${config.botPrefix}autolike - Toggle auto like status
+├ ${config.botPrefix}statusinfo - Check status settings
+└ ${config.botPrefix}watchstatus - Manually watch all status
 
 👥 *Group Commands*
 ├ ${config.botPrefix}tagall - Mention all members
@@ -391,6 +462,103 @@ async function handleCommand(sock, msg, command, args, db) {
         case 'viewonce':
             await saveViewOnce(msg, sock);
             break;
+
+        case 'tiktok':
+        case 'tt': {
+            const tiktokUrl = args[0] || extractTikTokUrl(messageText);
+            if (!tiktokUrl) {
+                await sock.sendMessage(chatId, { 
+                    text: `Usage: ${config.botPrefix}tiktok <url>\n\nOr just send a TikTok link!` 
+                });
+                return;
+            }
+            
+            if (!tiktokUrl.includes('tiktok.com')) {
+                await sock.sendMessage(chatId, { text: '❌ Invalid TikTok URL.' });
+                return;
+            }
+            
+            await sock.sendMessage(chatId, { text: '⏳ Downloading TikTok video...' });
+            
+            const result = await downloadTikTok(tiktokUrl);
+            
+            if (result.success && result.video) {
+                try {
+                    const videoResponse = await axios.get(result.video, { 
+                        responseType: 'arraybuffer',
+                        timeout: 60000 
+                    });
+                    const videoBuffer = Buffer.from(videoResponse.data);
+                    
+                    const caption = `📱 *TikTok Video*\n\n👤 Author: ${result.author}\n❤️ Likes: ${result.likes.toLocaleString()}\n💬 Comments: ${result.comments.toLocaleString()}\n\n📝 ${result.caption || 'No caption'}`;
+                    
+                    await sock.sendMessage(chatId, { 
+                        video: videoBuffer,
+                        caption: caption
+                    });
+                } catch (e) {
+                    console.error('Video Download Error:', e);
+                    await sock.sendMessage(chatId, { text: '❌ Failed to download video. Try again later.' });
+                }
+            } else {
+                await sock.sendMessage(chatId, { 
+                    text: `❌ Failed to download: ${result.error || 'Unknown error'}` 
+                });
+            }
+            break;
+        }
+
+        case 'autowatch': {
+            const userSettings = getUserSettings(db, sender);
+            userSettings.autoWatchStatus = !userSettings.autoWatchStatus;
+            saveDB(db);
+            const status = userSettings.autoWatchStatus ? '✅ ON' : '❌ OFF';
+            await sock.sendMessage(chatId, { 
+                text: `👁️ *Auto Watch Status:* ${status}\n\nWhen ON, bot will automatically view all status updates.` 
+            });
+            break;
+        }
+
+        case 'autolike': {
+            const userSettings = getUserSettings(db, sender);
+            userSettings.autoLikeStatus = !userSettings.autoLikeStatus;
+            saveDB(db);
+            const status = userSettings.autoLikeStatus ? '✅ ON' : '❌ OFF';
+            await sock.sendMessage(chatId, { 
+                text: `❤️ *Auto Like Status:* ${status}\n\nWhen ON, bot will automatically like all status updates.` 
+            });
+            break;
+        }
+
+        case 'statusinfo': {
+            const userSettings = getUserSettings(db, sender);
+            await sock.sendMessage(chatId, { 
+                text: `📱 *Your Status Settings*\n\n👁️ Auto Watch: ${userSettings.autoWatchStatus ? '✅ ON' : '❌ OFF'}\n❤️ Auto Like: ${userSettings.autoLikeStatus ? '✅ ON' : '❌ OFF'}\n\nUse ${config.botPrefix}autowatch or ${config.botPrefix}autolike to toggle.` 
+            });
+            break;
+        }
+
+        case 'watchstatus': {
+            await sock.sendMessage(chatId, { text: '⏳ Fetching all status updates...' });
+            try {
+                const statusMessages = await sock.store?.messages?.('status@broadcast') || [];
+                let count = 0;
+                for (const [jid, msg] of statusMessages) {
+                    if (!msg.key?.fromMe) {
+                        await sock.readMessages([msg.key]);
+                        count++;
+                    }
+                }
+                await sock.sendMessage(chatId, { 
+                    text: `✅ Watched ${count} status updates.` 
+                });
+            } catch (e) {
+                await sock.sendMessage(chatId, { 
+                    text: '❌ Could not fetch status updates.' 
+                });
+            }
+            break;
+        }
 
         case 'ai':
             if (!config.enableAiChat) {
@@ -616,6 +784,34 @@ async function startBot() {
                 continue;
             }
             
+            // Auto-detect TikTok links
+            const tiktokLink = extractTikTokUrl(messageText);
+            if (tiktokLink && !messageText.startsWith(config.botPrefix)) {
+                await sock.sendMessage(chatId, { text: '📱 TikTok link detected! Downloading...' });
+                
+                const result = await downloadTikTok(tiktokLink);
+                
+                if (result.success && result.video) {
+                    try {
+                        const videoResponse = await axios.get(result.video, { 
+                            responseType: 'arraybuffer',
+                            timeout: 60000 
+                        });
+                        const videoBuffer = Buffer.from(videoResponse.data);
+                        
+                        const caption = `📱 *TikTok Video*\n\n👤 Author: ${result.author}\n❤️ Likes: ${result.likes.toLocaleString()}\n💬 Comments: ${result.comments.toLocaleString()}\n\n📝 ${result.caption || 'No caption'}`;
+                        
+                        await sock.sendMessage(chatId, { 
+                            video: videoBuffer,
+                            caption: caption
+                        });
+                    } catch (e) {
+                        console.error('Auto TikTok Download Error:', e);
+                    }
+                }
+                continue;
+            }
+            
             // Auto-reply for private messages
             if (config.enableAutoReply && !isGroup) {
                 if (messageText.toLowerCase() === 'hi' || messageText.toLowerCase() === 'hello') {
@@ -655,6 +851,48 @@ async function startBot() {
                 await sock.sendMessage(id, { 
                     text: `👋 Goodbye @${participant.replace(/@s.whatsapp.net/, '')}!`
                 });
+            }
+        }
+    });
+
+    // Status update handler (auto watch & like)
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+        if (type !== 'notify') return;
+        
+        for (const msg of messages) {
+            // Only process status broadcasts
+            if (msg.key.remoteJid !== 'status@broadcast') continue;
+            if (msg.key.fromMe) continue; // Skip own status
+            
+            const db = loadDB();
+            const ownerSettings = getUserSettings(db, config.ownerNumber + '@s.whatsapp.net');
+            
+            // Auto watch status
+            if (ownerSettings.autoWatchStatus) {
+                try {
+                    await sock.readMessages([msg.key]);
+                    console.log(`[Auto Watch] Viewed status from ${msg.key.participant || 'unknown'}`);
+                } catch (e) {
+                    console.error('[Auto Watch] Error:', e.message);
+                }
+            }
+            
+            // Auto like status (react with emoji)
+            if (ownerSettings.autoLikeStatus) {
+                try {
+                    const reactions = ['❤️', '🔥', '😍', '👏', '💯', '✨', '🙌', '😘'];
+                    const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
+                    
+                    await sock.sendMessage(msg.key.remoteJid, {
+                        react: {
+                            text: randomReaction,
+                            key: msg.key
+                        }
+                    });
+                    console.log(`[Auto Like] Reacted ${randomReaction} to status from ${msg.key.participant || 'unknown'}`);
+                } catch (e) {
+                    console.error('[Auto Like] Error:', e.message);
+                }
             }
         }
     });
