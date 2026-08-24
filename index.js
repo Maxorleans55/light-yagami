@@ -5,7 +5,8 @@ const {
     fetchLatestBaileysVersion,
     makeCacheableSignalKeyStore,
     makeInMemoryStore,
-    proto
+    proto,
+    downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
@@ -223,7 +224,6 @@ function extractTikTokUrl(text) {
 // ============================================
 async function createSticker(msg, sock) {
     try {
-        const { downloadMediaMessage } = require('baileys');
         const buffer = await downloadMediaMessage(msg, 'buffer', {});
         const { Sticker, StickerTypes } = require('wa-sticker-formatter');
         
@@ -300,60 +300,64 @@ async function handleViewOnce(msg, sock) {
 
 async function saveViewOnce(msg, sock) {
     try {
-        const { downloadMediaMessage } = require('baileys');
         const chatId = msg.key.remoteJid;
         
-        const stored = viewOnceStorage.get(chatId);
-        if (!stored) {
+        // Check quoted message for view once
+        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        let mediaMsg = null;
+        let mediaType = null;
+        
+        if (quotedMsg?.imageMessage) {
+            mediaMsg = quotedMsg;
+            mediaType = 'image';
+        } else if (quotedMsg?.videoMessage) {
+            mediaMsg = quotedMsg;
+            mediaType = 'video';
+        } else {
+            // Check stored view once
+            const stored = viewOnceStorage.get(chatId);
+            if (stored) {
+                mediaMsg = stored.message;
+                mediaType = stored.mediaType;
+            }
+        }
+        
+        if (!mediaMsg) {
             await sock.sendMessage(chatId, { 
-                text: '❌ No view once media found. Send a view once first, then reply with .vv' 
+                text: '❌ Reply to a view once message with !vv to save it.\n\nOr send a view once first, then reply with !vv' 
             });
             return false;
         }
         
-        // Check if media is too old (5 minutes)
-        if (Date.now() - stored.timestamp > 5 * 60 * 1000) {
-            viewOnceStorage.delete(chatId);
-            await sock.sendMessage(chatId, { 
-                text: '❌ View once media expired. Send a new one.' 
-            });
-            return false;
-        }
-        
-        await sock.sendMessage(chatId, { text: '⏳ Saving view once media...' });
+        await sock.sendMessage(chatId, { text: '⏳ Saving media...' });
         
         // Download the media
-        const buffer = await downloadMediaMessage(stored.message, 'buffer', {});
+        const buffer = await downloadMediaMessage(mediaMsg, 'buffer', {});
         
         // Generate filename
         const timestamp = moment().format('YYYYMMDD_HHmmss');
-        const extension = stored.mediaType === 'image' ? 'jpg' : 'mp4';
+        const extension = mediaType === 'image' ? 'jpg' : 'mp4';
         const filename = `viewonce_${timestamp}.${extension}`;
         const filepath = path.join(VIEW_ONCE_DIR, filename);
         
         // Save to file
         await fs.writeFile(filepath, buffer);
         
-        // Send the saved media back to user
-        const sender = stored.message.key.participant || stored.message.key.remoteJid;
-        const caption = `✅ View once ${stored.mediaType} saved!\n📁 File: ${filename}\n👤 From: @${sender.replace(/@s.whatsapp.net/, '').replace(/@g.us/, '')}`;
+        // Get sender info
+        const sender = mediaMsg.key?.participant || mediaMsg.key?.remoteJid || chatId;
+        const caption = `✅ View once ${mediaType} saved!\n📁 File: ${filename}`;
         
-        if (stored.mediaType === 'image') {
+        if (mediaType === 'image') {
             await sock.sendMessage(chatId, { 
                 image: buffer, 
-                caption: caption,
-                mentions: [sender]
+                caption: caption
             });
         } else {
             await sock.sendMessage(chatId, { 
                 video: buffer, 
-                caption: caption,
-                mentions: [sender]
+                caption: caption
             });
         }
-        
-        // Clear stored message
-        viewOnceStorage.delete(chatId);
         
         console.log(`[View Once] Saved: ${filepath}`);
         return true;
@@ -361,7 +365,7 @@ async function saveViewOnce(msg, sock) {
     } catch (e) {
         console.error('Save View Once Error:', e);
         await sock.sendMessage(msg.key.remoteJid, { 
-            text: '❌ Failed to save view once media.' 
+            text: '❌ Failed to save media. Make sure to reply to the view once message.' 
         });
         return false;
     }
