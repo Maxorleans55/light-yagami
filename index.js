@@ -838,14 +838,17 @@ async function startBot() {
         const { id, participants, action } = update;
         
         for (const participant of participants) {
+            const jid = typeof participant === 'string' ? participant : participant.id;
+            const number = jid.replace(/@s.whatsapp.net/, '').replace(/@g.us/, '');
+            
             if (action === 'add') {
                 await sock.sendMessage(id, { 
-                    text: `👋 Welcome @${participant.replace(/@s.whatsapp.net/, '')}!\nUse ${config.botPrefix}menu to see commands.`,
-                    mentions: [participant]
+                    text: `👋 Welcome @${number}!\nUse ${config.botPrefix}menu to see commands.`,
+                    mentions: [jid]
                 });
             } else if (action === 'remove') {
                 await sock.sendMessage(id, { 
-                    text: `👋 Goodbye @${participant.replace(/@s.whatsapp.net/, '')}!`
+                    text: `👋 Goodbye @${number}!`
                 });
             }
         }
