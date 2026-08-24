@@ -274,23 +274,29 @@ async function handleViewOnce(msg, sock) {
         }
         
         // Check for view once in extended text message (quoted)
-        if (message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage?.viewOnce) {
-            viewOnceStorage.set(chatId, {
-                message: message.extendedTextMessage.contextInfo.quotedMessage,
-                mediaType: 'image',
-                timestamp: Date.now()
-            });
-            console.log(`[View Once] Quoted image stored for chat: ${chatId}`);
-            return;
-        }
+        const quotedImage = message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+        const quotedVideo = message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage;
         
-        if (message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage?.viewOnce) {
+        if (quotedImage?.viewOnce || quotedVideo?.viewOnce) {
+            const quotedMsg = message.extendedTextMessage.contextInfo.quotedMessage;
+            const quotedKey = message.extendedTextMessage.contextInfo.stanzaId;
+            
+            // Reconstruct the message with proper key
+            const reconstructedMsg = {
+                key: {
+                    remoteJid: chatId,
+                    id: quotedKey,
+                    fromMe: false
+                },
+                message: quotedMsg
+            };
+            
             viewOnceStorage.set(chatId, {
-                message: message.extendedTextMessage.contextInfo.quotedMessage,
-                mediaType: 'video',
+                message: reconstructedMsg,
+                mediaType: quotedImage ? 'image' : 'video',
                 timestamp: Date.now()
             });
-            console.log(`[View Once] Quoted video stored for chat: ${chatId}`);
+            console.log(`[View Once] Quoted ${quotedImage ? 'image' : 'video'} stored for chat: ${chatId}`);
             return;
         }
     } catch (e) {
@@ -307,11 +313,27 @@ async function saveViewOnce(msg, sock) {
         let mediaMsg = null;
         let mediaType = null;
         
-        if (quotedMsg?.imageMessage) {
-            mediaMsg = quotedMsg;
+        if (quotedMsg?.imageMessage?.viewOnce || quotedMsg?.imageMessage) {
+            const quotedKey = msg.message.extendedTextMessage.contextInfo.stanzaId;
+            mediaMsg = {
+                key: {
+                    remoteJid: chatId,
+                    id: quotedKey,
+                    fromMe: false
+                },
+                message: quotedMsg
+            };
             mediaType = 'image';
-        } else if (quotedMsg?.videoMessage) {
-            mediaMsg = quotedMsg;
+        } else if (quotedMsg?.videoMessage?.viewOnce || quotedMsg?.videoMessage) {
+            const quotedKey = msg.message.extendedTextMessage.contextInfo.stanzaId;
+            mediaMsg = {
+                key: {
+                    remoteJid: chatId,
+                    id: quotedKey,
+                    fromMe: false
+                },
+                message: quotedMsg
+            };
             mediaType = 'video';
         } else {
             // Check stored view once
@@ -343,8 +365,6 @@ async function saveViewOnce(msg, sock) {
         // Save to file
         await fs.writeFile(filepath, buffer);
         
-        // Get sender info
-        const sender = mediaMsg.key?.participant || mediaMsg.key?.remoteJid || chatId;
         const caption = `✅ View once ${mediaType} saved!\n📁 File: ${filename}`;
         
         if (mediaType === 'image') {
@@ -365,7 +385,7 @@ async function saveViewOnce(msg, sock) {
     } catch (e) {
         console.error('Save View Once Error:', e);
         await sock.sendMessage(msg.key.remoteJid, { 
-            text: '❌ Failed to save media. Make sure to reply to the view once message.' 
+            text: '❌ Failed to save media. View once media may have expired.' 
         });
         return false;
     }
