@@ -892,34 +892,47 @@ async function startBot() {
             if (msg.key.remoteJid !== 'status@broadcast') continue;
             if (msg.key.fromMe) continue; // Skip own status
             
-            console.log(`[Status] New status from: ${msg.key.participant || 'unknown'}`);
+            const statusFrom = msg.key.participant || 'unknown';
+            console.log(`[Status] New status from: ${statusFrom}`);
             
             const db = loadDB();
             const ownerSettings = getUserSettings(db, config.ownerNumber + '@s.whatsapp.net');
             
-            // Auto watch status
+            // Auto watch status - send proper read receipt for status
             if (ownerSettings.autoWatchStatus) {
                 try {
+                    // Send presence update to indicate viewing
+                    await sock.sendPresenceUpdate('available');
+                    
+                    // Send read receipt for status
                     await sock.readMessages([msg.key]);
-                    console.log(`[Auto Watch] Viewed status from ${msg.key.participant || 'unknown'}`);
+                    
+                    // Additional: send presence composing briefly
+                    await sock.sendPresenceUpdate('composing', 'status@broadcast');
+                    await new Promise(r => setTimeout(r, 1000));
+                    await sock.sendPresenceUpdate('paused', 'status@broadcast');
+                    
+                    console.log(`[Auto Watch] Viewed status from ${statusFrom}`);
                 } catch (e) {
                     console.error('[Auto Watch] Error:', e.message);
                 }
             }
             
-            // Auto like status (react with emoji)
+            // Auto like status - send reaction to status
             if (ownerSettings.autoLikeStatus) {
                 try {
                     const reactions = ['❤️', '🔥', '😍', '👏', '💯', '✨', '🙌', '😘'];
                     const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
                     
-                    await sock.sendMessage(msg.key.remoteJid, {
+                    // Send reaction to status broadcast
+                    await sock.sendMessage('status@broadcast', {
                         react: {
                             text: randomReaction,
                             key: msg.key
                         }
                     });
-                    console.log(`[Auto Like] Reacted ${randomReaction} to status from ${msg.key.participant || 'unknown'}`);
+                    
+                    console.log(`[Auto Like] Reacted ${randomReaction} to status from ${statusFrom}`);
                 } catch (e) {
                     console.error('[Auto Like] Error:', e.message);
                 }
