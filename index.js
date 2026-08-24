@@ -513,8 +513,9 @@ async function handleCommand(sock, msg, command, args, db) {
             userSettings.autoWatchStatus = !userSettings.autoWatchStatus;
             saveDB(db);
             const status = userSettings.autoWatchStatus ? '✅ ON' : '❌ OFF';
+            console.log(`[Auto Watch] Toggle: ${status} for ${sender}`);
             await sock.sendMessage(chatId, { 
-                text: `👁️ *Auto Watch Status:* ${status}\n\nWhen ON, bot will automatically view all status updates.` 
+                text: `👁️ *Auto Watch Status:* ${status}\n\nWhen ON, bot will automatically view all status updates.\n\n⚠️ Note: Works when friends post status updates.` 
             });
             break;
         }
@@ -524,8 +525,9 @@ async function handleCommand(sock, msg, command, args, db) {
             userSettings.autoLikeStatus = !userSettings.autoLikeStatus;
             saveDB(db);
             const status = userSettings.autoLikeStatus ? '✅ ON' : '❌ OFF';
+            console.log(`[Auto Like] Toggle: ${status} for ${sender}`);
             await sock.sendMessage(chatId, { 
-                text: `❤️ *Auto Like Status:* ${status}\n\nWhen ON, bot will automatically like all status updates.` 
+                text: `❤️ *Auto Like Status:* ${status}\n\nWhen ON, bot will automatically like all status updates.\n\n⚠️ Note: Works when friends post status updates.` 
             });
             break;
         }
@@ -539,24 +541,7 @@ async function handleCommand(sock, msg, command, args, db) {
         }
 
         case 'watchstatus': {
-            await sock.sendMessage(chatId, { text: '⏳ Fetching all status updates...' });
-            try {
-                const statusMessages = await sock.store?.messages?.('status@broadcast') || [];
-                let count = 0;
-                for (const [jid, msg] of statusMessages) {
-                    if (!msg.key?.fromMe) {
-                        await sock.readMessages([msg.key]);
-                        count++;
-                    }
-                }
-                await sock.sendMessage(chatId, { 
-                    text: `✅ Watched ${count} status updates.` 
-                });
-            } catch (e) {
-                await sock.sendMessage(chatId, { 
-                    text: '❌ Could not fetch status updates.' 
-                });
-            }
+            await sock.sendMessage(chatId, { text: '⏳ Status watching is now enabled!\n\nNew status updates will be automatically viewed.' });
             break;
         }
 
@@ -870,6 +855,8 @@ async function startBot() {
             // Only process status broadcasts
             if (msg.key.remoteJid !== 'status@broadcast') continue;
             if (msg.key.fromMe) continue; // Skip own status
+            
+            console.log(`[Status] New status from: ${msg.key.participant || 'unknown'}`);
             
             const db = loadDB();
             const ownerSettings = getUserSettings(db, config.ownerNumber + '@s.whatsapp.net');
