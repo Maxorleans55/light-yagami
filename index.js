@@ -70,6 +70,17 @@ function saveDB(data) {
 }
 
 // ============================================
+// VIEW ONCE STORAGE
+// ============================================
+const viewOnceStorage = new Map(); // chatId -> { message, mediaType, timestamp }
+const VIEW_ONCE_DIR = path.join(__dirname, 'view_once_media');
+
+// Create directory if not exists
+if (!fs.existsSync(VIEW_ONCE_DIR)) {
+    fs.mkdirSync(VIEW_ONCE_DIR, { recursive: true });
+}
+
+// ============================================
 // EXPRESS SERVER (for keep-alive on hosting)
 // ============================================
 const app = express();
@@ -173,6 +184,130 @@ async function createSticker(msg, sock) {
 }
 
 // ============================================
+// VIEW ONCE HANDLER
+// ============================================
+async function handleViewOnce(msg, sock) {
+    try {
+        const chatId = msg.key.remoteJid;
+        const message = msg.message;
+        
+        // Check for view once image
+        if (message?.imageMessage?.viewOnce) {
+            viewOnceStorage.set(chatId, {
+                message: msg,
+                mediaType: 'image',
+                timestamp: Date.now()
+            });
+            console.log(`[View Once] Image stored for chat: ${chatId}`);
+            return;
+        }
+        
+        // Check for view once video
+        if (message?.videoMessage?.viewOnce) {
+            viewOnceStorage.set(chatId, {
+                message: msg,
+                mediaType: 'video',
+                timestamp: Date.now()
+            });
+            console.log(`[View Once] Video stored for chat: ${chatId}`);
+            return;
+        }
+        
+        // Check for view once in extended text message (quoted)
+        if (message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage?.viewOnce) {
+            viewOnceStorage.set(chatId, {
+                message: message.extendedTextMessage.contextInfo.quotedMessage,
+                mediaType: 'image',
+                timestamp: Date.now()
+            });
+            console.log(`[View Once] Quoted image stored for chat: ${chatId}`);
+            return;
+        }
+        
+        if (message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage?.viewOnce) {
+            viewOnceStorage.set(chatId, {
+                message: message.extendedTextMessage.contextInfo.quotedMessage,
+                mediaType: 'video',
+                timestamp: Date.now()
+            });
+            console.log(`[View Once] Quoted video stored for chat: ${chatId}`);
+            return;
+        }
+    } catch (e) {
+        console.error('View Once Handler Error:', e);
+    }
+}
+
+async function saveViewOnce(msg, sock) {
+    try {
+        const { downloadMediaMessage } = require('baileys');
+        const chatId = msg.key.remoteJid;
+        
+        const stored = viewOnceStorage.get(chatId);
+        if (!stored) {
+            await sock.sendMessage(chatId, { 
+                text: '❌ No view once media found. Send a view once first, then reply with .vv' 
+            });
+            return false;
+        }
+        
+        // Check if media is too old (5 minutes)
+        if (Date.now() - stored.timestamp > 5 * 60 * 1000) {
+            viewOnceStorage.delete(chatId);
+            await sock.sendMessage(chatId, { 
+                text: '❌ View once media expired. Send a new one.' 
+            });
+            return false;
+        }
+        
+        await sock.sendMessage(chatId, { text: '⏳ Saving view once media...' });
+        
+        // Download the media
+        const buffer = await downloadMediaMessage(stored.message, 'buffer', {});
+        
+        // Generate filename
+        const timestamp = moment().format('YYYYMMDD_HHmmss');
+        const extension = stored.mediaType === 'image' ? 'jpg' : 'mp4';
+        const filename = `viewonce_${timestamp}.${extension}`;
+        const filepath = path.join(VIEW_ONCE_DIR, filename);
+        
+        // Save to file
+        await fs.writeFile(filepath, buffer);
+        
+        // Send the saved media back to user
+        const sender = stored.message.key.participant || stored.message.key.remoteJid;
+        const caption = `✅ View once ${stored.mediaType} saved!\n📁 File: ${filename}\n👤 From: @${sender.replace(/@s.whatsapp.net/, '').replace(/@g.us/, '')}`;
+        
+        if (stored.mediaType === 'image') {
+            await sock.sendMessage(chatId, { 
+                image: buffer, 
+                caption: caption,
+                mentions: [sender]
+            });
+        } else {
+            await sock.sendMessage(chatId, { 
+                video: buffer, 
+                caption: caption,
+                mentions: [sender]
+            });
+        }
+        
+        // Clear stored message
+        viewOnceStorage.delete(chatId);
+        
+        console.log(`[View Once] Saved: ${filepath}`);
+        return true;
+        
+    } catch (e) {
+        console.error('Save View Once Error:', e);
+        await sock.sendMessage(msg.key.remoteJid, { 
+            text: '❌ Failed to save view once media.' 
+        });
+        return false;
+    }
+}
+
+// ============================================
 // COMMAND HANDLER
 // ============================================
 async function handleCommand(sock, msg, command, args, db) {
@@ -195,6 +330,7 @@ async function handleCommand(sock, msg, command, args, db) {
 ├ ${config.botPrefix}ping - Check bot status
 ├ ${config.botPrefix}runtime - Bot uptime
 ├ ${config.botPrefix}sticker - Convert image to sticker
+├ ${config.botPrefix}vv - Save view once media
 └ ${config.botPrefix}owner - Bot owner info
 
 🤖 *AI Commands*
@@ -249,6 +385,11 @@ async function handleCommand(sock, msg, command, args, db) {
             await sock.sendMessage(chatId, { 
                 text: `👑 *Bot Owner*\nName: ${config.ownerName}\nNumber: ${config.ownerNumber}` 
             });
+            break;
+
+        case 'vv':
+        case 'viewonce':
+            await saveViewOnce(msg, sock);
             break;
 
         case 'ai':
@@ -452,6 +593,9 @@ async function startBot() {
             const chatId = msg.key.remoteJid;
             const sender = msg.key.participant || msg.key.remoteJid;
             const isGroup = chatId.endsWith('@g.us');
+            
+            // Handle view once messages FIRST (before any other processing)
+            await handleViewOnce(msg, sock);
             
             // Get message content
             let messageText = '';
