@@ -413,48 +413,44 @@ async function handleCommand(sock, msg, command, args, db) {
     switch (command.toLowerCase()) {
         case 'menu':
         case 'help':
-            const menuText = `
-╭━━━━━━━━━━━━━━━━━╮
-┃   *${config.botName}* Menu
-╰━━━━━━━━━━━━━━━━━╯
+            const menuText = `╔══════════════════════════════════╗
+║       *${config.botName}* Bot       
+╚══════════════════════════════════╝
 
-📐 *General Commands*
-├ ${config.botPrefix}menu - Show this menu
-├ ${config.botPrefix}ping - Check bot status
-├ ${config.botPrefix}runtime - Bot uptime
-├ ${config.botPrefix}sticker - Convert image to sticker
-├ ${config.botPrefix}vv - Save view once media
-└ ${config.botPrefix}owner - Bot owner info
+*📝 GENERAL*
+  ${config.botPrefix}menu      ─  Show this menu
+  ${config.botPrefix}ping      ─  Check bot status
+  ${config.botPrefix}runtime   ─  Bot uptime
+  ${config.botPrefix}sticker   ─  Image → sticker
+  ${config.botPrefix}vv        ─  Save view once
+  ${config.botPrefix}owner     ─  Bot owner info
 
-📥 *Download Commands*
-├ ${config.botPrefix}tiktok <url> - Download TikTok video
-├ ${config.botPrefix}tt <url> - Download TikTok video
-└ Auto-detect TikTok links in chat
+*📥 DOWNLOAD*
+  ${config.botPrefix}tiktok    ─  Download TikTok
+  ${config.botPrefix}tt        ─  Download TikTok
+  *Auto-detect:* Send TikTok link
 
-🤖 *AI Commands*
-├ ${config.botPrefix}ai <text> - Chat with AI
-├ ${config.botPrefix}gpt <text> - ChatGPT
-└ ${config.botPrefix}gemini <text> - Gemini AI
+*🤖 AI CHAT*
+  ${config.botPrefix}ai        ─  Chat with AI
+  ${config.botPrefix}gpt       ─  ChatGPT
+  ${config.botPrefix}gemini    ─  Gemini AI
 
-📱 *Status Commands*
-├ ${config.botPrefix}autowatch - Toggle auto watch status
-├ ${config.botPrefix}autolike - Toggle auto like status
-├ ${config.botPrefix}statusinfo - Check status settings
-└ ${config.botPrefix}watchstatus - Manually watch all status
+*📱 STATUS*
+  ${config.botPrefix}autowatch ─  Toggle auto view
+  ${config.botPrefix}autolike  ─  Toggle auto react
+  ${config.botPrefix}statusinfo ─ Check settings
 
-👥 *Group Commands*
-├ ${config.botPrefix}tagall - Mention all members
-├ ${config.botPrefix}kick @user - Remove member
-├ ${config.botPrefix}promote @user - Make admin
-└ ${config.botPrefix}demote @user - Remove admin
+*👥 GROUP*
+  ${config.botPrefix}tagall    ─  Mention all
+  ${config.botPrefix}kick      ─  Remove member
+  ${config.botPrefix}promote   ─  Make admin
+  ${config.botPrefix}demote    ─  Remove admin
 
-👑 *Owner Commands*
-├ ${config.botPrefix}restart - Restart bot
-├ ${config.botPrefix}broadcast <text> - Send to all
-└ ${config.botPrefix}block @user - Block user
+*👑 OWNER*
+  ${config.botPrefix}restart   ─  Restart bot
 
-⏰ *${getTimestamp()}*
-`;
+╚══════════════════════════════════╝
+_Bot by Max Shadows_`;
             await sock.sendMessage(chatId, { text: menuText });
             break;
 
