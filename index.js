@@ -421,9 +421,14 @@ async function handleCommand(sock, msg, command, args, db) {
   ${config.botPrefix}menu      ─  Show this menu
   ${config.botPrefix}ping      ─  Check bot status
   ${config.botPrefix}runtime   ─  Bot uptime
-  ${config.botPrefix}sticker   ─  Image → sticker
-  ${config.botPrefix}vv        ─  Save view once
   ${config.botPrefix}owner     ─  Bot owner info
+  ${config.botPrefix}info      ─  Bot info
+  ${config.botPrefix}speed     ─  Test speed
+
+*🎨 MEDIA*
+  ${config.botPrefix}sticker   ─  Image/video → sticker
+  ${config.botPrefix}vv        ─  Save view once
+  ${config.botPrefix}tomp3     ─  Video → audio
 
 *📥 DOWNLOAD*
   ${config.botPrefix}tiktok    ─  Download TikTok
@@ -434,6 +439,16 @@ async function handleCommand(sock, msg, command, args, db) {
   ${config.botPrefix}ai        ─  Chat with AI
   ${config.botPrefix}gpt       ─  ChatGPT
   ${config.botPrefix}gemini    ─  Gemini AI
+  ${config.botPrefix}translate ─  Translate text
+  ${config.botPrefix}define    ─  Define a word
+
+*🔧 TOOLS*
+  ${config.botPrefix}calc      ─  Calculator
+  ${config.botPrefix}reverse   ─  Reverse text
+  ${config.botPrefix}binary    ─  Text → binary
+  ${config.botPrefix}quote     ─  Random quote
+  ${config.botPrefix}joke      ─  Random joke
+  ${config.botPrefix}weather   ─  Weather info
 
 *📱 STATUS*
   ${config.botPrefix}autowatch ─  Toggle auto view
@@ -442,12 +457,16 @@ async function handleCommand(sock, msg, command, args, db) {
 
 *👥 GROUP*
   ${config.botPrefix}tagall    ─  Mention all
+  ${config.botPrefix}hidetag   ─  Hidden tag all
   ${config.botPrefix}kick      ─  Remove member
   ${config.botPrefix}promote   ─  Make admin
   ${config.botPrefix}demote    ─  Remove admin
+  ${config.botPrefix}antilink  ─  Toggle antilink
+  ${config.botPrefix}welcome   ─  Toggle welcome
 
 *👑 OWNER*
   ${config.botPrefix}restart   ─  Restart bot
+  ${config.botPrefix}leave     ─  Bot leave group
 
 ╚══════════════════════════════════╝
 _Bot by Max Shadows_`;
@@ -476,7 +495,16 @@ _Bot by Max Shadows_`;
             break;
         }
 
-        case 'runtime': {
+        case 'speed': {
+            const startTime = Date.now();
+            const msg = await sock.sendMessage(chatId, { text: '⏱️ Testing speed...' });
+            const speed = Date.now() - startTime;
+            await sock.sendMessage(chatId, { text: `⚡ *Speed Test Results*\n\n📬 Send: ${speed}ms\n🔄 Response: ${Date.now() - startTime}ms` });
+            break;
+        }
+
+        case 'runtime':
+        case 'uptime': {
             const uptime = process.uptime();
             const hours = Math.floor(uptime / 3600);
             const minutes = Math.floor((uptime % 3600) / 60);
@@ -489,6 +517,14 @@ _Bot by Max Shadows_`;
         case 'owner': {
             const ownerText = `👑 *Bot Owner*\n\nName: ${config.botName}\nNumber: ${config.ownerNumber}\n\nBot by Max Shadows`;
             await sock.sendMessage(chatId, { text: ownerText });
+            break;
+        }
+
+        case 'info': {
+            const nodeVersion = process.version;
+            const platform = process.platform;
+            const infoText = `ℹ️ *Bot Information*\n\n🤖 Name: ${config.botName}\n📱 Platform: ${platform}\n💚 Node.js: ${nodeVersion}\n⏱️ Uptime: ${Math.floor(process.uptime() / 60)} mins\n📊 RAM: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`;
+            await sock.sendMessage(chatId, { text: infoText });
             break;
         }
 
@@ -510,6 +546,26 @@ _Bot by Max Shadows_`;
             const result = await saveViewOnce(msg, sock);
             if (!result) {
                 await sock.sendMessage(chatId, { text: '❌ No view once media found. Reply to a view once message.' });
+            }
+            break;
+        }
+
+        case 'tomp3': {
+            const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+            if (!quotedMsg?.videoMessage && !msg.message?.videoMessage) {
+                await sock.sendMessage(chatId, { text: `Usage: ${config.botPrefix}tomp3\n\nReply to a video or send with a video.` });
+                return;
+            }
+            await sock.sendMessage(chatId, { text: '⏳ Converting to audio...' });
+            try {
+                const buffer = await downloadMediaMessage(msg, 'buffer', {});
+                await sock.sendMessage(chatId, { 
+                    audio: buffer, 
+                    mimetype: 'audio/mpeg',
+                    ptt: false 
+                });
+            } catch (e) {
+                await sock.sendMessage(chatId, { text: '❌ Failed to convert video.' });
             }
             break;
         }
@@ -641,6 +697,136 @@ _Bot by Max Shadows_`;
             await sock.sendMessage(chatId, { text: geminiResponse || 'Error getting response.' });
             break;
 
+        case 'translate': {
+            const lang = args[0];
+            const text = args.slice(1).join(' ');
+            if (!lang || !text) {
+                await sock.sendMessage(chatId, { text: `Usage: ${config.botPrefix}translate <lang> <text>\n\nExample: ${config.botPrefix}translate es hello world` });
+                return;
+            }
+            try {
+                const translateUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${lang}`;
+                const response = await axios.get(translateUrl);
+                const translated = response.data.responseData.translatedText;
+                await sock.sendMessage(chatId, { text: `🌐 *Translation*\n\nOriginal: ${text}\nTranslated (${lang}): ${translated}` });
+            } catch (e) {
+                await sock.sendMessage(chatId, { text: '❌ Translation failed.' });
+            }
+            break;
+        }
+
+        case 'define': {
+            const word = args[0];
+            if (!word) {
+                await sock.sendMessage(chatId, { text: `Usage: ${config.botPrefix}define <word>` });
+                return;
+            }
+            try {
+                const response = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+                const data = response.data[0];
+                const meaning = data.meanings[0];
+                const definition = meaning.definitions[0].definition;
+                const example = meaning.definitions[0].example || 'No example';
+                await sock.sendMessage(chatId, { 
+                    text: `📖 *${data.word}*\n\n📝 ${definition}\n\n💬 Example: ${example}\n\n🔊 ${data.phonetics[0]?.text || ''}` 
+                });
+            } catch (e) {
+                await sock.sendMessage(chatId, { text: `❌ Could not find definition for "${word}"` });
+            }
+            break;
+        }
+
+        case 'calc': {
+            const expression = args.join(' ');
+            if (!expression) {
+                await sock.sendMessage(chatId, { text: `Usage: ${config.botPrefix}calc <expression>\n\nExample: ${config.botPrefix}calc 2+2*3` });
+                return;
+            }
+            try {
+                const sanitized = expression.replace(/[^0-9+\-*/().]/g, '');
+                const result = eval(sanitized);
+                await sock.sendMessage(chatId, { text: `🔢 *Calculator*\n\nExpression: ${expression}\nResult: ${result}` });
+            } catch (e) {
+                await sock.sendMessage(chatId, { text: '❌ Invalid math expression.' });
+            }
+            break;
+        }
+
+        case 'reverse': {
+            const text = args.join(' ');
+            if (!text) {
+                await sock.sendMessage(chatId, { text: `Usage: ${config.botPrefix}reverse <text>` });
+                return;
+            }
+            const reversed = text.split('').reverse().join('');
+            await sock.sendMessage(chatId, { text: `🔄 *Reversed:* ${reversed}` });
+            break;
+        }
+
+        case 'binary': {
+            const text = args.join(' ');
+            if (!text) {
+                await sock.sendMessage(chatId, { text: `Usage: ${config.botPrefix}binary <text>` });
+                return;
+            }
+            const binary = text.split('').map(char => char.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
+            await sock.sendMessage(chatId, { text: `🔢 *Binary:* ${binary}` });
+            break;
+        }
+
+        case 'quote': {
+            try {
+                const response = await axios.get('https://api.quotable.io/random');
+                const { content, author } = response.data;
+                await sock.sendMessage(chatId, { text: `💫 *Quote*\n\n"${content}"\n\n— ${author}` });
+            } catch (e) {
+                const quotes = [
+                    { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+                    { text: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
+                    { text: "Life is what happens when you're busy making other plans.", author: "John Lennon" },
+                    { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+                    { text: "It is during our darkest moments that we must focus to see the light.", author: "Aristotle" }
+                ];
+                const quote = quotes[Math.floor(Math.random() * quotes.length)];
+                await sock.sendMessage(chatId, { text: `💫 *Quote*\n\n"${quote.text}"\n\n— ${quote.author}` });
+            }
+            break;
+        }
+
+        case 'joke': {
+            try {
+                const response = await axios.get('https://official-joke-api.appspot.com/random_joke');
+                const { setup, punchline } = response.data;
+                await sock.sendMessage(chatId, { text: `😄 *Joke*\n\n${setup}\n\n${punchline}` });
+            } catch (e) {
+                const jokes = [
+                    { setup: "Why don't scientists trust atoms?", punchline: "Because they make up everything!" },
+                    { setup: "Why did the scarecrow win an award?", punchline: "Because he was outstanding in his field!" },
+                    { setup: "What do you call a fake noodle?", punchline: "An impasta!" },
+                    { setup: "Why don't eggs tell jokes?", punchline: "They'd crack each other up!" },
+                    { setup: "What do you call a bear with no teeth?", punchline: "A gummy bear!" }
+                ];
+                const joke = jokes[Math.floor(Math.random() * jokes.length)];
+                await sock.sendMessage(chatId, { text: `😄 *Joke*\n\n${joke.setup}\n\n${joke.punchline}` });
+            }
+            break;
+        }
+
+        case 'weather': {
+            const city = args.join(' ');
+            if (!city) {
+                await sock.sendMessage(chatId, { text: `Usage: ${config.botPrefix}weather <city>\n\nExample: ${config.botPrefix}weather London` });
+                return;
+            }
+            try {
+                const response = await axios.get(`https://wttr.in/${encodeURIComponent(city)}?format=4`);
+                await sock.sendMessage(chatId, { text: `🌤️ *Weather*\n\n${response.data}` });
+            } catch (e) {
+                await sock.sendMessage(chatId, { text: `❌ Could not get weather for "${city}"` });
+            }
+            break;
+        }
+
         case 'tagall':
             if (!isGroup) {
                 await sock.sendMessage(chatId, { text: '❌ This command only works in groups.' });
@@ -656,6 +842,24 @@ _Bot by Max Shadows_`;
                 });
                 await sock.sendMessage(chatId, { 
                     text: tagText, 
+                    mentions: participants.map(p => p.id) 
+                });
+            } catch (e) {
+                await sock.sendMessage(chatId, { text: '❌ Error fetching group info.' });
+            }
+            break;
+
+        case 'hidetag':
+            if (!isGroup) {
+                await sock.sendMessage(chatId, { text: '❌ This command only works in groups.' });
+                return;
+            }
+            try {
+                const groupMetadata = await sock.groupMetadata(chatId);
+                const participants = groupMetadata.participants;
+                const text = args.join(' ') || '👋 Hello everyone!';
+                await sock.sendMessage(chatId, { 
+                    text: text, 
                     mentions: participants.map(p => p.id) 
                 });
             } catch (e) {
@@ -719,6 +923,48 @@ _Bot by Max Shadows_`;
                 await sock.sendMessage(chatId, { text: '❌ Failed to demote user.' });
             }
             break;
+
+        case 'antilink': {
+            if (!isGroup || !isBotOwner) {
+                await sock.sendMessage(chatId, { text: '❌ Owner only command in groups.' });
+                return;
+            }
+            const groupSettings = db.groups[chatId] || {};
+            groupSettings.antilink = !groupSettings.antilink;
+            db.groups[chatId] = groupSettings;
+            saveDB(db);
+            const status = groupSettings.antilink ? '✅ ON' : '❌ OFF';
+            await sock.sendMessage(chatId, { text: `🔗 *Antilink:* ${status}\n\nWhen ON, links from non-admins will be deleted.` });
+            break;
+        }
+
+        case 'welcome': {
+            if (!isGroup || !isBotOwner) {
+                await sock.sendMessage(chatId, { text: '❌ Owner only command in groups.' });
+                return;
+            }
+            const groupSettings = db.groups[chatId] || {};
+            groupSettings.welcome = !groupSettings.welcome;
+            db.groups[chatId] = groupSettings;
+            saveDB(db);
+            const status = groupSettings.welcome ? '✅ ON' : '❌ OFF';
+            await sock.sendMessage(chatId, { text: `👋 *Welcome Message:* ${status}\n\nWhen ON, new members get a welcome message.` });
+            break;
+        }
+
+        case 'leave': {
+            if (!isBotOwner) {
+                await sock.sendMessage(chatId, { text: '❌ Owner only command.' });
+                return;
+            }
+            if (!isGroup) {
+                await sock.sendMessage(chatId, { text: '❌ This command only works in groups.' });
+                return;
+            }
+            await sock.sendMessage(chatId, { text: '👋 Leaving group...' });
+            await sock.groupLeave(chatId);
+            break;
+        }
 
         case 'restart':
             if (!isBotOwner) {
@@ -831,6 +1077,28 @@ async function startBot() {
                 continue;
             }
             
+            // Antilink check (only for groups, skip own messages and admins)
+            if (isGroup && !isFromMe) {
+                const db = loadDB();
+                const groupSettings = db.groups[chatId] || {};
+                if (groupSettings.antilink && messageText.match(/https?:\/\/|www\.|\.com|\.net|\.org|\.xyz|\.link|\.chat|\.me|\.wa/)) {
+                    try {
+                        const groupMetadata = await sock.groupMetadata(chatId);
+                        const participants = groupMetadata.participants;
+                        const senderIsAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
+                        
+                        if (!senderIsAdmin) {
+                            await sock.sendMessage(chatId, { text: '🔗 Links are not allowed in this group!' });
+                            // Delete the message
+                            await sock.sendMessage(chatId, { delete: msg.key });
+                            continue;
+                        }
+                    } catch (e) {
+                        console.error('Antilink Error:', e);
+                    }
+                }
+            }
+            
             // Auto-detect TikTok links (skip own messages to avoid loops)
             const tiktokLink = extractTikTokUrl(messageText);
             if (tiktokLink && !messageText.startsWith(config.botPrefix) && !isFromMe) {
@@ -887,12 +1155,14 @@ async function startBot() {
         if (!config.enableGroupControl) return;
         
         const { id, participants, action } = update;
+        const db = loadDB();
+        const groupSettings = db.groups[id] || {};
         
         for (const participant of participants) {
             const jid = typeof participant === 'string' ? participant : participant.id;
             const number = jid.replace(/@s.whatsapp.net/, '').replace(/@g.us/, '');
             
-            if (action === 'add') {
+            if (action === 'add' && groupSettings.welcome !== false) {
                 await sock.sendMessage(id, { 
                     text: `👋 Welcome @${number}!\nUse ${config.botPrefix}menu to see commands.`,
                     mentions: [jid]
