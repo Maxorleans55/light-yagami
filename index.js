@@ -791,15 +791,16 @@ async function startBot() {
         if (type !== 'notify') return;
         
         for (const msg of messages) {
-            // Skip own messages and status broadcasts
-            if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue;
+            // Skip status broadcasts
+            if (msg.key.remoteJid === 'status@broadcast') continue;
             
             const chatId = msg.key.remoteJid;
             const sender = msg.key.participant || msg.key.remoteJid;
             const isGroup = chatId.endsWith('@g.us');
+            const isFromMe = msg.key.fromMe;
             
             // Debug: Log received message
-            console.log(`[Message] From: ${sender}, Chat: ${chatId}`);
+            console.log(`[Message] From: ${sender}, Chat: ${chatId}, fromMe: ${isFromMe}`);
             
             // Handle view once messages FIRST (before any other processing)
             await handleViewOnce(msg, sock);
@@ -822,14 +823,17 @@ async function startBot() {
             // Check for commands
             if (messageText.startsWith(config.botPrefix)) {
                 const [command, ...args] = messageText.slice(config.botPrefix.length).trim().split(/\s+/);
-                console.log(`[Command] ${command} with args: ${args.join(' ')}`);
+                console.log(`[Command] ${command} with args: ${args.join(' ')} (fromMe: ${isFromMe})`);
+                
+                // If message is fromMe (owner), check if it's in "Message Yourself" or a regular chat
+                // Allow owner to use commands in any chat
                 await handleCommand(sock, msg, command, args, loadDB());
                 continue;
             }
             
-            // Auto-detect TikTok links
+            // Auto-detect TikTok links (skip own messages to avoid loops)
             const tiktokLink = extractTikTokUrl(messageText);
-            if (tiktokLink && !messageText.startsWith(config.botPrefix)) {
+            if (tiktokLink && !messageText.startsWith(config.botPrefix) && !isFromMe) {
                 await sock.sendMessage(chatId, { text: '📱 TikTok link detected! Downloading...' });
                 
                 const result = await downloadTikTok(tiktokLink);
@@ -855,8 +859,8 @@ async function startBot() {
                 continue;
             }
             
-            // Auto-reply for private messages
-            if (config.enableAutoReply && !isGroup) {
+            // Auto-reply for private messages (skip own messages to avoid loops)
+            if (config.enableAutoReply && !isGroup && !isFromMe) {
                 if (messageText.toLowerCase() === 'hi' || messageText.toLowerCase() === 'hello') {
                     await sock.sendMessage(chatId, { 
                         text: `Hello! 👋 I'm ${config.botName}. Use ${config.botPrefix}menu to see commands.` 
@@ -864,8 +868,8 @@ async function startBot() {
                 }
             }
             
-            // AI chat in private messages
-            if (config.enableAiChat && !isGroup && !messageText.startsWith(config.botPrefix)) {
+            // AI chat in private messages (skip own messages to avoid loops)
+            if (config.enableAiChat && !isGroup && !isFromMe && !messageText.startsWith(config.botPrefix)) {
                 // Only respond to direct messages (not group mentions)
                 if (!isGroup && messageText.length > 0 && Math.random() < 0.3) {
                     // Respond to 30% of messages to avoid spam
