@@ -411,6 +411,59 @@ async function handleCommand(sock, msg, command, args, db) {
     const isBotOwner = senderNumber === formatNumber(config.ownerNumber);
     
     switch (command.toLowerCase()) {
+        case 'menu':
+        case 'help':
+            const menuText = `╔══════════════════════════════════╗
+║       *${config.botName}* Bot       
+╚══════════════════════════════════╝
+
+*📝 GENERAL*
+  ${config.botPrefix}menu      ─  Show this menu
+  ${config.botPrefix}ping      ─  Check bot status
+  ${config.botPrefix}runtime   ─  Bot uptime
+  ${config.botPrefix}sticker   ─  Image → sticker
+  ${config.botPrefix}vv        ─  Save view once
+  ${config.botPrefix}owner     ─  Bot owner info
+
+*📥 DOWNLOAD*
+  ${config.botPrefix}tiktok    ─  Download TikTok
+  ${config.botPrefix}tt        ─  Download TikTok
+  *Auto-detect:* Send TikTok link
+
+*🤖 AI CHAT*
+  ${config.botPrefix}ai        ─  Chat with AI
+  ${config.botPrefix}gpt       ─  ChatGPT
+  ${config.botPrefix}gemini    ─  Gemini AI
+
+*📱 STATUS*
+  ${config.botPrefix}autowatch ─  Toggle auto view
+  ${config.botPrefix}autolike  ─  Toggle auto react
+  ${config.botPrefix}statusinfo ─ Check settings
+
+*👥 GROUP*
+  ${config.botPrefix}tagall    ─  Mention all
+  ${config.botPrefix}kick      ─  Remove member
+  ${config.botPrefix}promote   ─  Make admin
+  ${config.botPrefix}demote    ─  Remove admin
+
+*👑 OWNER*
+  ${config.botPrefix}restart   ─  Restart bot
+
+╚══════════════════════════════════╝
+_Bot by Max Shadows_`;
+            
+            // Send image with menu
+            const menuImagePath = path.join(__dirname, 'menu-image.png');
+            if (fs.existsSync(menuImagePath)) {
+                const menuImageBuffer = await fs.readFile(menuImagePath);
+                await sock.sendMessage(chatId, { 
+                    image: menuImageBuffer, 
+                    caption: menuText 
+                });
+            } else {
+                await sock.sendMessage(chatId, { text: menuText });
+            }
+            break;
 
         case 'tiktok':
         case 'tt': {
