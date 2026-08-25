@@ -77,6 +77,26 @@ Deploy your bot in one click:
 
 ---
 
+## 🌐 Web Pairing Interface
+
+After deploying, access the web interface at your app URL:
+
+```
+https://your-app-name.herokuapp.com
+```
+
+### How to Connect:
+
+1. **Open the web interface** in your browser
+2. **Enter your phone number** with country code
+3. **Get your pairing code**
+4. **Open WhatsApp** → Settings → Linked Devices
+5. **Tap "Link with Phone Number Instead"**
+6. **Enter the code**
+7. **Done!** Your device is connected
+
+---
+
 ## 📋 Commands
 
 | Command | Description | Usage |
