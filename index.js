@@ -452,18 +452,67 @@ async function handleCommand(sock, msg, command, args, db) {
 ╚══════════════════════════════════╝
 _Bot by Max Shadows_`;
             
-            // Send image with menu
-            const menuImagePath = path.join(__dirname, 'menu-image.png');
-            if (fs.existsSync(menuImagePath)) {
-                const menuImageBuffer = await fs.readFile(menuImagePath);
-                await sock.sendMessage(chatId, { 
-                    image: menuImageBuffer, 
-                    caption: menuText 
-                });
-            } else {
+            try {
+                const menuImagePath = path.join(__dirname, 'menu-image.png');
+                if (fs.existsSync(menuImagePath)) {
+                    const menuImageBuffer = await fs.readFile(menuImagePath);
+                    await sock.sendMessage(chatId, { 
+                        image: menuImageBuffer, 
+                        caption: menuText 
+                    });
+                } else {
+                    await sock.sendMessage(chatId, { text: menuText });
+                }
+            } catch (e) {
                 await sock.sendMessage(chatId, { text: menuText });
             }
             break;
+
+        case 'ping': {
+            const startTime = Date.now();
+            await sock.sendMessage(chatId, { text: '⚡ Pinging...' });
+            const latency = Date.now() - startTime;
+            await sock.sendMessage(chatId, { text: `*Pong!*\n⚡ Latency: ${latency}ms` });
+            break;
+        }
+
+        case 'runtime': {
+            const uptime = process.uptime();
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = Math.floor(uptime % 60);
+            const runtimeText = `⏱️ *Bot Runtime*\n\nHours: ${hours}\nMinutes: ${minutes}\nSeconds: ${seconds}`;
+            await sock.sendMessage(chatId, { text: runtimeText });
+            break;
+        }
+
+        case 'owner': {
+            const ownerText = `👑 *Bot Owner*\n\nName: ${config.botName}\nNumber: ${config.ownerNumber}\n\nBot by Max Shadows`;
+            await sock.sendMessage(chatId, { text: ownerText });
+            break;
+        }
+
+        case 'sticker': {
+            const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+            if (!quotedMsg?.imageMessage && !quotedMsg?.videoMessage && !msg.message?.imageMessage && !msg.message?.videoMessage) {
+                await sock.sendMessage(chatId, { text: `Usage: ${config.botPrefix}sticker\n\nReply to an image/video or send with an image.` });
+                return;
+            }
+            await sock.sendMessage(chatId, { text: '⏳ Creating sticker...' });
+            const stickerResult = await createSticker(msg, sock);
+            if (!stickerResult) {
+                await sock.sendMessage(chatId, { text: '❌ Failed to create sticker.' });
+            }
+            break;
+        }
+
+        case 'vv': {
+            const result = await saveViewOnce(msg, sock);
+            if (!result) {
+                await sock.sendMessage(chatId, { text: '❌ No view once media found. Reply to a view once message.' });
+            }
+            break;
+        }
 
         case 'tiktok':
         case 'tt': {
