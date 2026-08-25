@@ -81,23 +81,48 @@ Deploy your bot in one click:
 
 | Command | Description | Usage |
 |---------|-------------|-------|
+| **📝 GENERAL** | | |
 | `!menu` | Show all commands | `!menu` |
 | `!ping` | Check bot status | `!ping` |
 | `!runtime` | Show bot uptime | `!runtime` |
-| `!sticker` | Image to sticker | `!sticker` |
+| `!owner` | Bot owner info | `!owner` |
+| `!info` | Bot information | `!info` |
+| `!speed` | Test speed | `!speed` |
+| **🎨 MEDIA** | | |
+| `!sticker` | Image/video to sticker | `!sticker` |
 | `!vv` | Save view once | `!vv` |
+| `!tomp3` | Video to audio | `!tomp3` |
+| **📥 DOWNLOAD** | | |
 | `!tiktok` | Download TikTok | `!tiktok <url>` |
 | `!tt` | Download TikTok | `!tt <url>` |
+| **🤖 AI CHAT** | | |
 | `!ai` | Chat with AI | `!ai Hello` |
 | `!gpt` | ChatGPT | `!gpt What is life?` |
 | `!gemini` | Gemini AI | `!gemini Explain quantum` |
+| `!translate` | Translate text | `!translate es hello` |
+| `!define` | Define a word | `!define happiness` |
+| **🔧 TOOLS** | | |
+| `!calc` | Calculator | `!calc 2+2*3` |
+| `!reverse` | Reverse text | `!reverse hello` |
+| `!binary` | Text to binary | `!binary hello` |
+| `!quote` | Random quote | `!quote` |
+| `!joke` | Random joke | `!joke` |
+| `!weather` | Weather info | `!weather London` |
+| **📱 STATUS** | | |
 | `!autowatch` | Toggle auto watch | `!autowatch` |
 | `!autolike` | Toggle auto like | `!autolike` |
+| `!statusinfo` | Check settings | `!statusinfo` |
+| **👥 GROUP** | | |
 | `!tagall` | Mention all | `!tagall` |
+| `!hidetag` | Hidden tag all | `!hidetag` |
 | `!kick` | Remove user | `!kick @user` |
 | `!promote` | Make admin | `!promote @user` |
 | `!demote` | Remove admin | `!demote @user` |
+| `!antilink` | Toggle antilink | `!antilink` |
+| `!welcome` | Toggle welcome msg | `!welcome` |
+| **👑 OWNER** | | |
 | `!restart` | Restart bot | `!restart` |
+| `!leave` | Bot leave group | `!leave` |
 
 ---
 
