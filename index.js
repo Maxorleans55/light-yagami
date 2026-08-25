@@ -451,7 +451,18 @@ async function handleCommand(sock, msg, command, args, db) {
 
 ╚══════════════════════════════════╝
 _Bot by Max Shadows_`;
-            await sock.sendMessage(chatId, { text: menuText });
+            
+            // Send image with menu
+            const menuImagePath = path.join(__dirname, 'menu-image.png');
+            if (fs.existsSync(menuImagePath)) {
+                const menuImageBuffer = await fs.readFile(menuImagePath);
+                await sock.sendMessage(chatId, { 
+                    image: menuImageBuffer, 
+                    caption: menuText 
+                });
+            } else {
+                await sock.sendMessage(chatId, { text: menuText });
+            }
             break;
 
         case 'ping':
