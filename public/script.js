@@ -1,0 +1,144 @@
+let currentPairing = null;
+let checkInterval = null;
+
+// Request pairing code
+async function requestPairing() {
+    const countryCode = document.getElementById('countryCode').value;
+    const phoneNumber = document.getElementById('phoneNumber').value.trim();
+    
+    if (!phoneNumber) {
+        alert('Please enter your phone number');
+        return;
+    }
+    
+    // Validate phone number (basic validation)
+    const fullNumber = countryCode + phoneNumber;
+    if (phoneNumber.length < 7 || phoneNumber.length > 12) {
+        alert('Please enter a valid phone number');
+        return;
+    }
+    
+    // Show loader
+    document.getElementById('btnText').style.display = 'none';
+    document.getElementById('btnLoader').style.display = 'inline-block';
+    document.querySelector('.btn-primary').disabled = true;
+    
+    try {
+        const response = await fetch('/api/pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phoneNumber: fullNumber })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentPairing = data.pairingCode;
+            
+            // Update UI
+            document.getElementById('pairingCode').textContent = formatPairingCode(data.pairingCode);
+            document.getElementById('phoneCard').classList.add('hidden');
+            document.getElementById('pairingCard').classList.remove('hidden');
+            
+            // Update steps
+            document.getElementById('step1').classList.remove('active');
+            document.getElementById('step1').classList.add('completed');
+            document.getElementById('step2').classList.add('active');
+            
+            // Start checking connection status
+            startStatusCheck(data.pairingCode);
+        } else {
+            alert(data.error || 'Failed to generate pairing code');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to connect to server');
+    } finally {
+        document.getElementById('btnText').style.display = 'inline';
+        document.getElementById('btnLoader').style.display = 'none';
+        document.querySelector('.btn-primary').disabled = false;
+    }
+}
+
+// Format pairing code with dashes
+function formatPairingCode(code) {
+    if (!code) return '---';
+    // Format as XXXX-XXXX-XXXX
+    return code.replace(/(.{4})/g, '$1-').slice(0, -1);
+}
+
+// Start checking connection status
+function startStatusCheck(pairingCode) {
+    if (checkInterval) clearInterval(checkInterval);
+    
+    checkInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/api/status/${pairingCode}`);
+            const data = await response.json();
+            
+            if (data.connected) {
+                clearInterval(checkInterval);
+                showSuccess();
+            } else if (data.expired) {
+                clearInterval(checkInterval);
+                showError('Pairing code expired. Please try again.');
+            }
+        } catch (error) {
+            console.error('Status check error:', error);
+        }
+    }, 2000);
+}
+
+// Show success
+function showSuccess() {
+    document.getElementById('pairingCard').classList.add('hidden');
+    document.getElementById('successCard').classList.remove('hidden');
+    
+    // Update steps
+    document.getElementById('step2').classList.remove('active');
+    document.getElementById('step2').classList.add('completed');
+    document.getElementById('step3').classList.add('active');
+    
+    // Update status
+    const status = document.getElementById('status');
+    status.innerHTML = '<span class="status-dot"></span><span>Connected!</span>';
+    status.classList.add('success');
+}
+
+// Show error
+function showError(message) {
+    const status = document.getElementById('status');
+    status.innerHTML = `<span class="status-dot"></span><span>${message}</span>`;
+    status.classList.add('error');
+    
+    setTimeout(() => {
+        document.getElementById('pairingCard').classList.add('hidden');
+        document.getElementById('phoneCard').classList.remove('hidden');
+        document.getElementById('step1').classList.add('active');
+        document.getElementById('step2').classList.remove('active');
+    }, 3000);
+}
+
+// Cancel pairing
+function cancelPairing() {
+    if (checkInterval) clearInterval(checkInterval);
+    
+    document.getElementById('pairingCard').classList.add('hidden');
+    document.getElementById('phoneCard').classList.remove('hidden');
+    
+    // Reset steps
+    document.getElementById('step1').classList.add('active');
+    document.getElementById('step2').classList.remove('active');
+}
+
+// Allow only numbers in phone input
+document.getElementById('phoneNumber').addEventListener('input', function(e) {
+    this.value = this.value.replace(/[^0-9]/g, '');
+});
+
+// Allow Enter key to submit
+document.getElementById('phoneNumber').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        requestPairing();
+    }
+});

@@ -97,8 +97,194 @@ if (!fs.existsSync(VIEW_ONCE_DIR)) {
 // EXPRESS SERVER (for keep-alive on hosting)
 // ============================================
 const app = express();
-app.get('/', (req, res) => res.send(`${config.botName} is Running!`));
+app.use(express.json());
+app.use(express.static('public'));
+
+// Store pairing states
+const pairingStates = new Map();
+
+// API Routes
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.get('/status', (req, res) => res.json({ status: 'online', bot: config.botName }));
+
+// Request pairing code
+app.post('/api/pair', async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+        
+        if (!phoneNumber) {
+            return res.json({ success: false, error: 'Phone number required' });
+        }
+        
+        // Clean phone number
+        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+        
+        // Generate pairing code (8 characters)
+        const pairingCode = generatePairingCode();
+        
+        // Store pairing state
+        pairingStates.set(pairingCode, {
+            phoneNumber: cleanNumber,
+            status: 'pending',
+            createdAt: Date.now(),
+            sock: null
+        });
+        
+        console.log(`[Pairing] Request for ${cleanNumber}, code: ${pairingCode}`);
+        
+        // Start pairing process in background
+        startPairing(cleanNumber, pairingCode);
+        
+        res.json({ success: true, pairingCode });
+    } catch (error) {
+        console.error('[Pairing] Error:', error);
+        res.json({ success: false, error: 'Failed to generate pairing code' });
+    }
+});
+
+// Check pairing status
+app.get('/api/status/:code', (req, res) => {
+    const state = pairingStates.get(req.params.code);
+    
+    if (!state) {
+        return res.json({ connected: false, expired: true });
+    }
+    
+    // Check if expired (5 minutes)
+    if (Date.now() - state.createdAt > 5 * 60 * 1000) {
+        pairingStates.delete(req.params.code);
+        return res.json({ connected: false, expired: true });
+    }
+    
+    res.json({ 
+        connected: state.status === 'connected',
+        expired: false 
+    });
+});
+
+// Generate pairing code
+function generatePairingCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+// Start pairing process
+async function startPairing(phoneNumber, pairingCode) {
+    try {
+        const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
+        const { Boom } = require('@hapi/boom');
+        const pino = require('pino');
+        
+        const authDir = `./auth_${pairingCode}`;
+        
+        const { state, saveCreds } = await useMultiFileAuthState(authDir);
+        const { version } = await fetchLatestBaileysVersion();
+        
+        const sock = makeWASocket({
+            version,
+            logger: pino({ level: 'silent' }),
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+            },
+            printQRInTerminal: false,
+            browser: ['Light Yagami', 'Chrome', '4.0.0'],
+            generateHighQualityLinkPreview: true
+        });
+        
+        // Store sock reference
+        const stateObj = pairingStates.get(pairingCode);
+        if (stateObj) stateObj.sock = sock;
+        
+        // Connection updates
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            
+            if (connection === 'close') {
+                const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+                console.log(`[Pairing ${pairingCode}] Connection closed. Reason: ${reason}`);
+                
+                if (reason === DisconnectReason.loggedOut) {
+                    pairingStates.delete(pairingCode);
+                }
+            }
+            
+            if (connection === 'open') {
+                console.log(`[Pairing ${pairingCode}] Connected!`);
+                const stateObj = pairingStates.get(pairingCode);
+                if (stateObj) {
+                    stateObj.status = 'connected';
+                    
+                    // Move auth to main auth_info
+                    try {
+                        const fs = require('fs-extra');
+                        const mainAuthDir = './auth_info';
+                        
+                        // Create main auth dir if not exists
+                        if (!fs.existsSync(mainAuthDir)) {
+                            fs.mkdirSync(mainAuthDir, { recursive: true });
+                        }
+                        
+                        // Copy auth files
+                        const files = fs.readdirSync(authDir);
+                        for (const file of files) {
+                            fs.copyFileSync(`${authDir}/${file}`, `${mainAuthDir}/${file}`);
+                        }
+                        
+                        // Cleanup temp auth
+                        fs.removeSync(authDir);
+                        
+                        console.log('[Pairing] Auth moved to main directory');
+                        
+                        // Restart main bot with new auth
+                        console.log('[Pairing] Restarting main bot...');
+                        setTimeout(() => process.exit(0), 2000);
+                    } catch (e) {
+                        console.error('[Pairing] Error moving auth:', e);
+                    }
+                }
+            }
+        });
+        
+        // Save credentials
+        sock.ev.on('creds.update', saveCreds);
+        
+        // Request pairing code
+        setTimeout(async () => {
+            try {
+                const code = await sock.requestPairingCode(phoneNumber);
+                console.log(`[Pairing] Code requested: ${code}`);
+            } catch (e) {
+                console.error('[Pairing] Error requesting code:', e);
+            }
+        }, 3000);
+        
+    } catch (error) {
+        console.error('[Pairing] Error:', error);
+        pairingStates.delete(pairingCode);
+    }
+}
+
+// Cleanup old pairing states every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [code, state] of pairingStates.entries()) {
+        if (now - state.createdAt > 5 * 60 * 1000) {
+            if (state.sock) {
+                try { state.sock.end(); } catch (e) {}
+            }
+            pairingStates.delete(code);
+        }
+    }
+}, 5 * 60 * 1000);
+
 app.listen(config.port, () => console.log(`Server running on port ${config.port}`));
 
 // ============================================
