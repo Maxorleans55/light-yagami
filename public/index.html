@@ -3,18 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Light Yagami Bot - Dashboard</title>
+    <title>Light Yagami Bot - Connect</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Background -->
+    <!-- Background Image -->
     <div class="bg-image"></div>
     <div class="bg-overlay"></div>
-
-    <!-- Toast Container -->
-    <div id="toast" class="toast hidden"></div>
-
+    
     <div class="container">
         <!-- Header -->
         <div class="header">
@@ -26,167 +23,179 @@
             <p class="tagline">JUSTICE IS WRITTEN BY ME</p>
         </div>
 
-        <!-- Live Status Bar -->
-        <div class="status-bar" id="statusBar">
-            <div class="status-indicator">
-                <span class="pulse-dot" id="pulseDot"></span>
-                <span id="botStatus">Connecting...</span>
+        <!-- Steps -->
+        <div class="steps">
+            <div class="step active" id="step1">
+                <div class="step-number">1</div>
+                <span>Enter Phone</span>
             </div>
-            <div class="status-stats">
-                <span id="uptime">0m</span>
-                <span class="divider">|</span>
-                <span id="memory">0MB</span>
+            <div class="step-line"></div>
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <span>Get Code</span>
             </div>
-        </div>
-
-        <!-- Quick Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <span class="stat-icon">👥</span>
-                <span class="stat-value" id="userCount">0</span>
-                <span class="stat-label">Users</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-icon">💬</span>
-                <span class="stat-value" id="groupCount">0</span>
-                <span class="stat-label">Groups</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-icon">🔗</span>
-                <span class="stat-value" id="sessionCount">0</span>
-                <span class="stat-label">Sessions</span>
+            <div class="step-line"></div>
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <span>Link Device</span>
             </div>
         </div>
 
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab active" data-tab="connect" onclick="switchTab('connect')">Connect</button>
-            <button class="tab" data-tab="commands" onclick="switchTab('commands')">Commands</button>
-            <button class="tab" data-tab="channel" onclick="switchTab('channel')">Channel</button>
+        <!-- Phone Input Card -->
+        <div class="card" id="phoneCard">
+            <h2>Enter Your Phone Number</h2>
+            <p class="card-desc">Enter your WhatsApp phone number with country code</p>
+            
+            <div class="phone-input-group">
+                <div class="country-select">
+                    <select id="countryCode">
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+44">🇬🇧 +44</option>
+                        <option value="+91">🇮🇳 +91</option>
+                        <option value="+233" selected>🇬🇭 +233</option>
+                        <option value="+234">🇳🇬 +234</option>
+                        <option value="+254">🇰🇪 +254</option>
+                        <option value="+27">🇿🇦 +27</option>
+                        <option value="+61">🇦🇺 +61</option>
+                        <option value="+81">🇯🇵 +81</option>
+                        <option value="+86">🇨🇳 +86</option>
+                        <option value="+49">🇩🇪 +49</option>
+                        <option value="+33">🇫🇷 +33</option>
+                        <option value="+39">🇮🇹 +39</option>
+                        <option value="+34">🇪🇸 +34</option>
+                        <option value="+55">🇧🇷 +55</option>
+                        <option value="+52">🇲🇽 +52</option>
+                        <option value="+62">🇮🇩 +62</option>
+                        <option value="+60">🇲🇾 +60</option>
+                        <option value="+63">🇵🇭 +63</option>
+                        <option value="+66">🇹🇭 +66</option>
+                        <option value="+84">🇻🇳 +84</option>
+                        <option value="+82">🇰🇷 +82</option>
+                        <option value="+90">🇹🇷 +90</option>
+                        <option value="+966">🇸🇦 +966</option>
+                        <option value="+971">🇦🇪 +971</option>
+                        <option value="+977">🇳🇵 +977</option>
+                        <option value="+94">🇱🇰 +94</option>
+                        <option value="+880">🇧🇩 +880</option>
+                        <option value="+92">🇵🇰 +92</option>
+                        <option value="+20">🇪🇬 +20</option>
+                        <option value="+212">🇲🇦 +212</option>
+                        <option value="+216">🇹🇳 +216</option>
+                        <option value="+213">🇩🇿 +213</option>
+                        <option value="+256">🇺🇬 +256</option>
+                        <option value="+255">🇹🇿 +255</option>
+                        <option value="+263">🇿🇼 +263</option>
+                        <option value="+267">🇧🇼 +267</option>
+                        <option value="+264">🇳🇦 +264</option>
+                        <option value="+268">🇸🇿 +268</option>
+                        <option value="+266">🇱🇸 +266</option>
+                        <option value="+260">🇿🇲 +260</option>
+                        <option value="+265">🇲🇼 +265</option>
+                        <option value="+258">🇲🇿 +258</option>
+                        <option value="+251">🇪🇹 +251</option>
+                        <option value="+252">🇸🇴 +252</option>
+                        <option value="+253">🇩🇯 +253</option>
+                        <option value="+257">🇧🇮 +257</option>
+                        <option value="+243">🇨🇩 +243</option>
+                        <option value="+242">🇨🇬 +242</option>
+                        <option value="+237">🇨🇲 +237</option>
+                        <option value="+236">🇨🇫 +236</option>
+                        <option value="+235">🇹🇩 +235</option>
+                        <option value="+231">🇱🇷 +231</option>
+                        <option value="+232">🇸🇱 +232</option>
+                        <option value="+226">🇧🇫 +226</option>
+                        <option value="+225">🇨🇮 +225</option>
+                        <option value="+224">🇬🇳 +224</option>
+                        <option value="+223">🇲🇱 +223</option>
+                        <option value="+222">🇲🇷 +222</option>
+                        <option value="+221">🇸🇳 +221</option>
+                        <option value="+220">🇬🇲 +220</option>
+                        <option value="+218">🇱🇾 +218</option>
+                        <option value="+217">🇸🇩 +217</option>
+                        <option value="+211">🇸🇸 +211</option>
+                        <option value="+210">🇨🇻 +210</option>
+                        <option value="+245">🇬🇼 +245</option>
+                        <option value="+240">🇬🇶 +240</option>
+                        <option value="+241">🇬🇦 +241</option>
+                        <option value="+262">🇷🇪 +262</option>
+                        <option value="+269">🇰🇲 +269</option>
+                        <option value="+261">🇲🇬 +261</option>
+                        <option value="+230">🇲🇺 +230</option>
+                        <option value="+248">🇸🇨 +248</option>
+                        <option value="+290">🇸🇭 +290</option>
+                    </select>
+                </div>
+                <input type="tel" id="phoneNumber" placeholder="Enter phone number" maxlength="15">
+            </div>
+            
+            <button class="btn-primary" onclick="requestPairing()">
+                <span id="btnText">Get Pairing Code</span>
+                <span id="btnLoader" class="loader" style="display:none"></span>
+            </button>
         </div>
 
-        <!-- Tab: Connect -->
-        <div class="tab-content active" id="tab-connect">
-            <!-- Steps -->
-            <div class="steps">
-                <div class="step active" id="step1">
-                    <div class="step-number">1</div>
-                    <span>Enter Phone</span>
-                </div>
-                <div class="step-line"></div>
-                <div class="step" id="step2">
-                    <div class="step-number">2</div>
-                    <span>Get Code</span>
-                </div>
-                <div class="step-line"></div>
-                <div class="step" id="step3">
-                    <div class="step-number">3</div>
-                    <span>Link Device</span>
-                </div>
+        <!-- Pairing Code Card -->
+        <div class="card hidden" id="pairingCard">
+            <h2>Your Pairing Code</h2>
+            <p class="card-desc">Enter this code in WhatsApp to link your device</p>
+            
+            <div class="pairing-code" id="pairingCode">---</div>
+            
+            <div class="instructions">
+                <h3>How to Link:</h3>
+                <ol>
+                    <li>Open WhatsApp on your phone</li>
+                    <li>Go to <strong>Settings</strong> → <strong>Linked Devices</strong></li>
+                    <li>Tap <strong>"Link a Device"</strong></li>
+                    <li>Tap <strong>"Link with Phone Number Instead"</strong></li>
+                    <li>Enter the code above</li>
+                </ol>
             </div>
-
-            <!-- Phone Input Card -->
-            <div class="card" id="phoneCard">
-                <h2>Enter Your Phone Number</h2>
-                <p class="card-desc">Enter your WhatsApp phone number with country code</p>
-                
-                <div class="phone-input-group">
-                    <div class="country-select">
-                        <select id="countryCode">
-                            <option value="+1">🇺🇸 +1</option>
-                            <option value="+44">🇬🇧 +44</option>
-                            <option value="+91">🇮🇳 +91</option>
-                            <option value="+233" selected>🇬🇭 +233</option>
-                            <option value="+234">🇳🇬 +234</option>
-                            <option value="+254">🇰🇪 +254</option>
-                            <option value="+27">🇿🇦 +27</option>
-                            <option value="+61">🇦🇺 +61</option>
-                            <option value="+81">🇯🇵 +81</option>
-                            <option value="+86">🇨🇳 +86</option>
-                            <option value="+49">🇩🇪 +49</option>
-                            <option value="+33">🇫🇷 +33</option>
-                            <option value="+55">🇧🇷 +55</option>
-                            <option value="+62">🇮🇩 +62</option>
-                            <option value="+92">🇵🇰 +92</option>
-                            <option value="+20">🇪🇬 +20</option>
-                        </select>
-                    </div>
-                    <input type="tel" id="phoneNumber" placeholder="Enter phone number" maxlength="15">
-                </div>
-                
-                <button class="btn-primary" onclick="requestPairing()">
-                    <span id="btnText">Get Pairing Code</span>
-                    <span id="btnLoader" class="loader" style="display:none"></span>
-                </button>
+            
+            <div class="status" id="status">
+                <span class="status-dot"></span>
+                <span>Waiting for connection...</span>
             </div>
-
-            <!-- Pairing Code Card -->
-            <div class="card hidden" id="pairingCard">
-                <h2>Your Pairing Code</h2>
-                <p class="card-desc">Enter this code in WhatsApp to link your device</p>
-                
-                <div class="pairing-code" id="pairingCode">---</div>
-                
-                <div class="instructions">
-                    <h3>How to Link:</h3>
-                    <ol>
-                        <li>Open WhatsApp on your phone</li>
-                        <li>Go to <strong>Settings</strong> → <strong>Linked Devices</strong></li>
-                        <li>Tap <strong>"Link a Device"</strong></li>
-                        <li>Tap <strong>"Link with Phone Number Instead"</strong></li>
-                        <li>Enter the code above</li>
-                    </ol>
-                </div>
-                
-                <div class="status" id="status">
-                    <span class="status-dot"></span>
-                    <span>Waiting for connection...</span>
-                </div>
-                
-                <button class="btn-secondary" onclick="cancelPairing()">Cancel</button>
-            </div>
-
-            <!-- Success Card -->
-            <div class="card hidden" id="successCard">
-                <div class="success-icon">⚡</div>
-                <h2>Device Connected!</h2>
-                <p class="card-desc">Your device is now linked to the bot</p>
-                
-                <div class="features">
-                    <div class="feature">
-                        <span class="feature-icon">💬</span>
-                        <span>Send commands in any chat</span>
-                    </div>
-                    <div class="feature">
-                        <span class="feature-icon">📥</span>
-                        <span>Download TikTok videos</span>
-                    </div>
-                    <div class="feature">
-                        <span class="feature-icon">🤖</span>
-                        <span>Chat with AI</span>
-                    </div>
-                    <div class="feature">
-                        <span class="feature-icon">🎨</span>
-                        <span>Create stickers</span>
-                    </div>
-                </div>
-                
-                <button class="btn-primary" onclick="location.reload()">Connect Another Device</button>
-            </div>
+            
+            <button class="btn-secondary" onclick="cancelPairing()">Cancel</button>
         </div>
 
-        <!-- Tab: Commands -->
-        <div class="tab-content" id="tab-commands">
-            <div class="commands-list" id="commandsList">
-                <div class="loading-state">
-                    <div class="loader"></div>
-                    <span>Loading commands...</span>
+        <!-- Success Card -->
+        <div class="card hidden" id="successCard">
+            <div class="success-icon">⚡</div>
+            <h2>Device Connected!</h2>
+            <p class="card-desc">Your device is now linked to the bot</p>
+            
+            <div class="features">
+                <div class="feature">
+                    <span class="feature-icon">💬</span>
+                    <span>Send commands in any chat</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📥</span>
+                    <span>Download TikTok videos</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🤖</span>
+                    <span>Chat with AI</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🎨</span>
+                    <span>Create stickers</span>
                 </div>
             </div>
+            
+            <button class="btn-primary" onclick="location.reload()">Connect Another Device</button>
         </div>
 
-        <!-- Tab: Channel -->
-        <div class="tab-content" id="tab-channel">
+        <!-- Footer -->
+        <div class="footer">
+            <p>Bot by <strong>Max Shadows</strong></p>
+            <p>Use <code>!menu</code> in WhatsApp to see all commands</p>
+        </div>
+
+        <!-- WhatsApp Channel -->
+        <div class="channel-section">
             <div class="channel-card">
                 <div class="channel-header">
                     <div class="channel-logo">
@@ -205,12 +214,6 @@
                     Follow Channel
                 </a>
             </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <p>Bot by <strong>Max Shadows</strong></p>
-            <p>Use <code>!menu</code> in WhatsApp to see all commands</p>
         </div>
     </div>
 
