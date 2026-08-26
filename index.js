@@ -339,7 +339,7 @@ setInterval(() => {
     }
 }, 5 * 60 * 1000);
 
-app.listen(config.port, () => console.log(`Server running on port ${config.port}`));
+app.listen(config.port, '0.0.0.0', () => console.log(`Server running on port ${config.port}`));
 
 // ============================================
 // UTILITY FUNCTIONS
