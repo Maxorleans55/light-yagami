@@ -113,6 +113,56 @@ app.get('/', (req, res) => {
 
 app.get('/status', (req, res) => res.json({ status: 'online', bot: config.botName }));
 
+// Dynamic API endpoints
+app.get('/api/bot-status', (req, res) => {
+    const isConnected = mainSock && mainSock.user;
+    res.json({
+        online: !!mainSock,
+        connected: !!isConnected,
+        botName: config.botName,
+        owner: config.ownerName,
+        prefix: config.botPrefix,
+        uptime: process.uptime(),
+        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        pairingCount: pairingStates.size,
+        activeSessions: activeSessions.size
+    });
+});
+
+app.get('/api/commands', (req, res) => {
+    res.json({
+        commands: [
+            { name: 'menu', desc: 'Show all commands', icon: '📋', category: 'general' },
+            { name: 'ai <text>', desc: 'Chat with AI', icon: '🤖', category: 'ai' },
+            { name: 'tiktok <url>', desc: 'Download TikTok video', icon: '📱', category: 'download' },
+            { name: 'sticker', desc: 'Convert image to sticker', icon: '🎨', category: 'tools' },
+            { name: 'translate <text>', desc: 'Translate text', icon: '🌐', category: 'tools' },
+            { name: 'weather <city>', desc: 'Get weather info', icon: '🌤️', category: 'tools' },
+            { name: 'joke', desc: 'Get a random joke', icon: '😂', category: 'fun' },
+            { name: 'quote', desc: 'Get random quote', icon: '💬', category: 'fun' },
+            { name: 'calc <expr>', desc: 'Calculate expression', icon: '🔢', category: 'tools' },
+            { name: 'define <word>', desc: 'Define a word', icon: '📖', category: 'tools' },
+            { name: 'info', desc: 'Bot information', icon: 'ℹ️', category: 'general' },
+            { name: 'speed', desc: 'Bot speed test', icon: '⚡', category: 'general' },
+            { name: 'hidetag <text>', desc: 'Tag all members', icon: '📢', category: 'group' },
+            { name: 'antilink on/off', desc: 'Toggle antilink', icon: '🔗', category: 'group' },
+            { name: 'welcome on/off', desc: 'Toggle welcome msg', icon: '👋', category: 'group' },
+            { name: 'viewon on/off', desc: 'Auto save view once', icon: '👁️', category: 'tools' }
+        ]
+    });
+});
+
+app.get('/api/stats', (req, res) => {
+    const db = loadDB();
+    res.json({
+        totalUsers: Object.keys(db.users).length,
+        totalGroups: Object.keys(db.groups).length,
+        uptime: Math.floor(process.uptime()),
+        nodeVersion: process.version,
+        platform: process.platform
+    });
+});
+
 // Request pairing code - uses main socket, no separate socket
 app.post('/api/pair', async (req, res) => {
     try {
