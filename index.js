@@ -114,10 +114,16 @@ app.get('/', (req, res) => {
 app.get('/status', (req, res) => res.json({ status: 'online', bot: config.botName }));
 
 // Request pairing code - uses main socket, no separate socket
+let pairingLock = false;
+
 app.post('/api/pair', async (req, res) => {
     try {
         if (!mainSock) {
             return res.json({ success: false, error: 'Bot not connected yet. Wait for QR scan or try again.' });
+        }
+        
+        if (pairingLock) {
+            return res.json({ success: false, error: 'A pairing request is already in progress. Please wait.' });
         }
         
         const { phoneNumber } = req.body;
@@ -135,32 +141,36 @@ app.post('/api/pair', async (req, res) => {
         }
         
         // Check if main bot is registered (has auth)
-        if (mainSock.authState?.creds?.registered) {
-            console.log(`[Pairing] Bot is already registered. Pairing code can only be used to link NEW devices.`);
-            return res.json({ success: false, error: 'Bot is already connected. Pairing only works for new devices.' });
+        const fs = require('fs');
+        const authExists = fs.existsSync('./auth_info/creds.json');
+        if (authExists || mainSock.authState?.creds?.registered) {
+            console.log(`[Pairing] Bot is already registered. Pairing only works for new devices.`);
+            return res.json({ success: false, error: 'Bot is already connected. Disconnect the owner first to pair a new device.' });
         }
         
+        pairingLock = true;
         console.log(`[Pairing] Requesting pairing code for: ${cleanNumber}`);
         
         // Request pairing code with timeout
         const code = await Promise.race([
             mainSock.requestPairingCode(cleanNumber),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Pairing code request timed out')), 30000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Pairing code request timed out (30s)')), 30000))
         ]);
+        
+        pairingLock = false;
         console.log(`[Pairing] Pairing code generated: ${code}`);
         
         // Store pairing state
-        const tempCode = generatePairingCode();
-        pairingStates.set(tempCode, {
+        pairingStates.set(code, {
             phoneNumber: cleanNumber,
             status: 'pending',
-            createdAt: Date.now(),
-            actualCode: code
+            createdAt: Date.now()
         });
         
         // Return the actual pairing code
         res.json({ success: true, pairingCode: code });
     } catch (error) {
+        pairingLock = false;
         console.error('[Pairing] Error:', error.message || error);
         res.json({ success: false, error: error.message || 'Failed to generate pairing code' });
     }
@@ -170,22 +180,10 @@ app.post('/api/pair', async (req, res) => {
 app.get('/api/status/:code', (req, res) => {
     const code = req.params.code;
     
-    // Check by temp code, active session, or actual pairing code
-    let state = pairingStates.get(code);
-    let activeSession = activeSessions.get(code);
+    const state = pairingStates.get(code);
+    const session = activeSessions.get(code);
     
-    if (!state && !activeSession) {
-        // Search by actual pairing code
-        for (const [tempCode, s] of pairingStates.entries()) {
-            if (s.actualCode === code) {
-                state = s;
-                activeSession = activeSessions.get(tempCode);
-                break;
-            }
-        }
-    }
-    
-    if (!state && !activeSession) {
+    if (!state && !session) {
         return res.json({ connected: false, expired: true });
     }
     
@@ -195,7 +193,7 @@ app.get('/api/status/:code', (req, res) => {
         return res.json({ connected: false, expired: true });
     }
     
-    const isConnected = (state && state.status === 'connected') || activeSession;
+    const isConnected = (state && state.status === 'connected') || !!session;
     
     res.json({ 
         connected: isConnected,
