@@ -175,8 +175,21 @@ app.get('/api/actual-code/:tempCode', (req, res) => {
 // Check pairing status
 app.get('/api/status/:code', (req, res) => {
     const code = req.params.code;
-    const state = pairingStates.get(code);
-    const activeSession = activeSessions.get(code);
+    
+    // Check by temp code, active session, or actual pairing code
+    let state = pairingStates.get(code);
+    let activeSession = activeSessions.get(code);
+    
+    if (!state && !activeSession) {
+        // Search by actual pairing code
+        for (const [tempCode, s] of pairingStates.entries()) {
+            if (s.actualCode === code) {
+                state = s;
+                activeSession = activeSessions.get(tempCode);
+                break;
+            }
+        }
+    }
     
     if (!state && !activeSession) {
         return res.json({ connected: false, expired: true });

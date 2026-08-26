@@ -1,0 +1,13 @@
+{
+  "name": "Light Yagami Bot",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "onCreateCommand": "npm install && (command -v cloudflared >/dev/null 2>&1 || (curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared))",
+  "postStartCommand": "nohup cloudflared tunnel --url http://localhost:3000 > /tmp/cloudflared.log 2>&1 & sleep 5 && cat /tmp/cloudflared.log | grep 'trycloudflare.com' || echo 'cloudflared starting... check /tmp/cloudflared.log'",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Bot Server",
+      "onAutoForward": "openBrowser"
+    }
+  }
+}

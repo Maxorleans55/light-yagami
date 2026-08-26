@@ -49,8 +49,8 @@ async function requestPairing() {
             // Update status
             document.getElementById('status').innerHTML = '<span class="status-dot"></span><span>Enter this code in WhatsApp (within 2 minutes)</span>';
             
-            // Start checking connection status
-            startStatusCheck(fullNumber);
+            // Start checking connection status using the pairing code
+            startStatusCheck(data.pairingCode);
         } else {
             showError(data.error || 'Failed to generate pairing code');
             document.getElementById('pairingCard').classList.add('hidden');
@@ -72,13 +72,12 @@ async function requestPairing() {
 }
 
 // Check connection status
-function startStatusCheck(phoneNumber) {
+function startStatusCheck(pairingCode) {
     if (statusInterval) clearInterval(statusInterval);
     
     statusInterval = setInterval(async () => {
         try {
-            const cleanNumber = phoneNumber.replace(/\D/g, '');
-            const response = await fetch(`/api/status/${cleanNumber}`);
+            const response = await fetch(`/api/status/${pairingCode}`);
             const data = await response.json();
             
             if (data.connected) {
