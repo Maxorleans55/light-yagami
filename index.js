@@ -103,6 +103,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Store pairing states
 const pairingStates = new Map();
 const activeSessions = new Map();
+let mainSock = null;
+let mainSaveCreds = null;
 
 // API Routes
 app.get('/', (req, res) => {
@@ -111,9 +113,13 @@ app.get('/', (req, res) => {
 
 app.get('/status', (req, res) => res.json({ status: 'online', bot: config.botName }));
 
-// Request pairing code
+// Request pairing code - uses main socket, no separate socket
 app.post('/api/pair', async (req, res) => {
     try {
+        if (!mainSock) {
+            return res.json({ success: false, error: 'Bot not connected yet. Wait for QR scan or try again.' });
+        }
+        
         const { phoneNumber } = req.body;
         
         if (!phoneNumber) {
@@ -128,48 +134,34 @@ app.post('/api/pair', async (req, res) => {
             return res.json({ success: false, error: 'Invalid phone number format' });
         }
         
-        // Generate pairing code (8 characters)
-        const pairingCode = generatePairingCode();
+        // Check if main bot is registered (has auth)
+        if (mainSock.authState?.creds?.registered) {
+            console.log(`[Pairing] Bot is already registered. Pairing code can only be used to link NEW devices.`);
+            console.log(`[Pairing] This bot is already connected. Other users cannot pair - the owner's session is active.`);
+        }
+        
+        console.log(`[Pairing] Requesting pairing code for: ${cleanNumber}`);
+        
+        // Request pairing code directly from main socket
+        // The fixed Baileys handles browser normalization internally
+        const code = await mainSock.requestPairingCode(cleanNumber);
+        console.log(`[Pairing] Pairing code generated: ${code}`);
         
         // Store pairing state
-        pairingStates.set(pairingCode, {
+        const tempCode = generatePairingCode();
+        pairingStates.set(tempCode, {
             phoneNumber: cleanNumber,
             status: 'pending',
             createdAt: Date.now(),
-            sock: null,
-            actualCode: null
+            actualCode: code
         });
         
-        console.log(`[Pairing] Request for ${cleanNumber}, temp code: ${pairingCode}`);
-        
-        // Start pairing process and get the actual WhatsApp pairing code directly
-        const actualCode = await startPairing(cleanNumber, pairingCode);
-        
         // Return the actual pairing code
-        res.json({ success: true, pairingCode: actualCode });
+        res.json({ success: true, pairingCode: code });
     } catch (error) {
-        console.error('[Pairing] Error:', error);
-        res.json({ success: false, error: 'Failed to generate pairing code' });
+        console.error('[Pairing] Error:', error.message || error);
+        res.json({ success: false, error: error.message || 'Failed to generate pairing code' });
     }
-});
-
-// Get actual pairing code from WhatsApp
-app.get('/api/actual-code/:tempCode', (req, res) => {
-    const state = pairingStates.get(req.params.tempCode);
-    
-    console.log(`[API] Actual code request for: ${req.params.tempCode}, state:`, state ? 'found' : 'not found');
-    
-    if (!state) {
-        return res.json({ success: false, error: 'Invalid code' });
-    }
-    
-    console.log(`[API] Actual code: ${state.actualCode}, status: ${state.status}`);
-    
-    res.json({ 
-        success: true, 
-        actualCode: state.actualCode,
-        status: state.status 
-    });
 });
 
 // Check pairing status
@@ -219,141 +211,17 @@ function generatePairingCode() {
     return code;
 }
 
-// Start pairing process - returns a Promise that resolves with the actual pairing code
-function startPairing(phoneNumber, pairingCode) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
-            const { Boom } = require('@hapi/boom');
-            const pino = require('pino');
-            
-            const authDir = `./auth_${pairingCode}`;
-            
-            const { state, saveCreds } = await useMultiFileAuthState(authDir);
-            const { version } = await fetchLatestBaileysVersion();
-            
-            const sock = makeWASocket({
-                version,
-                logger: pino({ level: 'silent' }),
-                auth: {
-                    creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
-                },
-                printQRInTerminal: false,
-                browser: ['Light Yagami Pairing', 'Safari', '3.0.0'],
-                generateHighQualityLinkPreview: true,
-                transactionOpts: { maxCommitBatchSize: 10 },
-                connectTimeout: 60000,
-                qrTimeout: 120000
-            });
-            
-            // Store sock reference
-            const stateObj = pairingStates.get(pairingCode);
-            if (stateObj) stateObj.sock = sock;
-            
-            let pairingRequested = false;
-            
-            // Connection updates
-            sock.ev.on('connection.update', async (update) => {
-                const { connection, lastDisconnect, qr, isNewLogin } = update;
-                
-                console.log(`[Pairing ${pairingCode}] Connection update: ${connection || (qr ? 'qr received' : 'other')}`);
-                
-                // Request pairing code when QR event fires (only on first QR)
-                if (qr && !sock.authState.creds.registered && !pairingRequested) {
-                    console.log(`[Pairing ${pairingCode}] Requesting pairing code for: ${phoneNumber}`);
-                    try {
-                        const code = await sock.requestPairingCode(phoneNumber);
-                        console.log(`[Pairing ${pairingCode}] Pairing code: ${code}`);
-                        pairingRequested = true;
-                        
-                        // Update the stored pairing code with actual code
-                        const stateObj = pairingStates.get(pairingCode);
-                        if (stateObj) {
-                            stateObj.actualCode = code;
-                        }
-                        
-                        // Resolve the promise with the actual pairing code
-                        resolve(code);
-                    } catch (e) {
-                        console.error(`[Pairing ${pairingCode}] Error requesting code:`, e.message);
-                        reject(e);
-                    }
-                }
-                
-                if (connection === 'close') {
-                    const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-                    console.log(`[Pairing ${pairingCode}] Connection closed. Reason: ${reason}`);
-                    
-                    if (reason === DisconnectReason.loggedOut) {
-                        pairingStates.delete(pairingCode);
-                        activeSessions.delete(pairingCode);
-                    }
-                }
-                
-                if (connection === 'open') {
-                    console.log(`[Pairing ${pairingCode}] Connected!`);
-                    const stateObj = pairingStates.get(pairingCode);
-                    if (stateObj) {
-                        stateObj.status = 'connected';
-                        activeSessions.set(pairingCode, { phoneNumber, connectedAt: Date.now() });
-                        
-                        // Move auth to main auth_info
-                        try {
-                            const fs = require('fs-extra');
-                            const mainAuthDir = './auth_info';
-                            
-                            // Create main auth dir if not exists
-                            if (!fs.existsSync(mainAuthDir)) {
-                                fs.mkdirSync(mainAuthDir, { recursive: true });
-                            }
-                            
-                            // Copy auth files
-                            const files = fs.readdirSync(authDir);
-                            for (const file of files) {
-                                fs.copyFileSync(`${authDir}/${file}`, `${mainAuthDir}/${file}`);
-                            }
-                            
-                            // Cleanup temp auth
-                            fs.removeSync(authDir);
-                            
-                            console.log('[Pairing] Auth moved to main directory');
-                            
-                            // Restart main bot with new auth
-                            console.log('[Pairing] Restarting main bot...');
-                            setTimeout(() => process.exit(0), 2000);
-                        } catch (e) {
-                            console.error('[Pairing] Error moving auth:', e);
-                        }
-                    }
-                }
-            });
-            
-            // Save credentials
-            sock.ev.on('creds.update', saveCreds);
-            
-        } catch (error) {
-            console.error('[Pairing] Error:', error);
-            pairingStates.delete(pairingCode);
-            activeSessions.delete(pairingCode);
-            reject(error);
-        }
-    });
-}
-
 // Cleanup old pairing states every 5 minutes
 setInterval(() => {
     const now = Date.now();
     for (const [code, state] of pairingStates.entries()) {
         if (now - state.createdAt > 5 * 60 * 1000) {
-            if (state.sock) {
-                try { state.sock.end(); } catch (e) {}
-            }
             pairingStates.delete(code);
             activeSessions.delete(code);
         }
     }
 }, 5 * 60 * 1000);
+
 
 app.listen(config.port, '0.0.0.0', () => console.log(`Server running on port ${config.port}`));
 
@@ -1255,40 +1123,54 @@ async function startBot() {
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
         },
         printQRInTerminal: false,
-        browser: [config.botName, 'Chrome', '4.0.0'],
-        generateHighQualityLinkPreview: true
+        browser: ['Chrome', 'Chrome', '20.0.04'],
+        generateHighQualityLinkPreview: true,
+        markOnlineOnConnect: true
     });
 
-    // Save credentials on update
-    sock.ev.on('creds.update', saveCreds);
+    // Store main socket globally for pairing API
+    mainSock = sock;
+    mainSaveCreds = saveCreds;
+
+    // Save credentials on update - MUST await before handling close
+    sock.ev.on('creds.update', async () => {
+        await saveCreds();
+    });
 
     // Connection updates
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr, isNewLogin } = update;
         
         if (qr) {
             console.log('\n📱 Scan QR Code below:\n');
             qrcode.generate(qr, { small: true });
         }
         
+        // After pairing success, WA sends 515 (restartRequired) - this is EXPECTED
         if (connection === 'close') {
             const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
             console.log(`Connection closed. Reason: ${reason}`);
             
-            if (reason !== DisconnectReason.loggedOut && reason !== 408) {
-                console.log('Reconnecting...');
+            // 515 = restartRequired (expected after pair-success)
+            // Must reconnect IMMEDIATELY - no delay, no max attempts
+            if (reason === 515 || reason === DisconnectReason.restartRequired) {
+                console.log('Pairing successful! Reconnecting with new credentials...');
+                mainSock = null;
+                startBot();
+            } else if (reason !== DisconnectReason.loggedOut) {
+                console.log('Reconnecting in 5s...');
+                mainSock = null;
                 setTimeout(() => startBot(), 5000);
-            } else if (reason === 408) {
-                console.log('Connection timed out. Retrying in 10s...');
-                setTimeout(() => startBot(), 10000);
             } else {
                 console.log('Logged out. Please scan QR again.');
+                mainSock = null;
                 setTimeout(() => startBot(), 3000);
             }
         }
         
         if (connection === 'open') {
             console.log(`\n✅ ${config.botName} Bot is Online!\n`);
+            console.log(`Bot is ready to receive commands.`);
         }
     });
 
