@@ -35,8 +35,8 @@ async function requestPairing() {
         if (data.success) {
             currentPairing = data.pairingCode;
             
-            // Update UI
-            document.getElementById('pairingCode').textContent = formatPairingCode(data.pairingCode);
+            // Show waiting state
+            document.getElementById('pairingCode').textContent = 'Loading...';
             document.getElementById('phoneCard').classList.add('hidden');
             document.getElementById('pairingCard').classList.remove('hidden');
             
@@ -45,8 +45,8 @@ async function requestPairing() {
             document.getElementById('step1').classList.add('completed');
             document.getElementById('step2').classList.add('active');
             
-            // Start checking connection status
-            startStatusCheck(data.pairingCode);
+            // Start polling for actual code
+            pollForActualCode(data.pairingCode);
         } else {
             alert(data.error || 'Failed to generate pairing code');
         }
@@ -58,6 +58,50 @@ async function requestPairing() {
         document.getElementById('btnLoader').style.display = 'none';
         document.querySelector('.btn-primary').disabled = false;
     }
+}
+
+// Poll for actual WhatsApp pairing code
+let pollInterval = null;
+
+async function pollForActualCode(tempCode) {
+    if (pollInterval) clearInterval(pollInterval);
+    
+    let attempts = 0;
+    const maxAttempts = 30; // 30 seconds
+    
+    pollInterval = setInterval(async () => {
+        attempts++;
+        
+        if (attempts > maxAttempts) {
+            clearInterval(pollInterval);
+            showError('Timeout waiting for pairing code. Please try again.');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/actual-code/${tempCode}`);
+            const data = await response.json();
+            
+            if (data.success && data.actualCode) {
+                clearInterval(pollInterval);
+                
+                // Format the actual code (XXXX-XXXX)
+                const formattedCode = data.actualCode.replace(/(.{4})/g, '$1-').slice(0, -1);
+                document.getElementById('pairingCode').textContent = formattedCode;
+                
+                // Update status
+                document.getElementById('status').innerHTML = '<span class="status-dot"></span><span>Enter this code in WhatsApp</span>';
+                
+                // Start checking connection status
+                startStatusCheck(tempCode);
+            } else if (data.status === 'connected') {
+                clearInterval(pollInterval);
+                showSuccess();
+            }
+        } catch (error) {
+            console.log('Polling...', attempts);
+        }
+    }, 1000);
 }
 
 // Format pairing code with dashes

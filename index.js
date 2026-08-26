@@ -119,8 +119,13 @@ app.post('/api/pair', async (req, res) => {
             return res.json({ success: false, error: 'Phone number required' });
         }
         
-        // Clean phone number
-        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+        // Clean phone number - remove all non-digits
+        const cleanNumber = phoneNumber.replace(/\D/g, '');
+        
+        // Validate phone number format
+        if (cleanNumber.length < 10 || cleanNumber.length > 15) {
+            return res.json({ success: false, error: 'Invalid phone number format' });
+        }
         
         // Generate pairing code (8 characters)
         const pairingCode = generatePairingCode();
@@ -130,19 +135,36 @@ app.post('/api/pair', async (req, res) => {
             phoneNumber: cleanNumber,
             status: 'pending',
             createdAt: Date.now(),
-            sock: null
+            sock: null,
+            actualCode: null
         });
         
-        console.log(`[Pairing] Request for ${cleanNumber}, code: ${pairingCode}`);
+        console.log(`[Pairing] Request for ${cleanNumber}, temp code: ${pairingCode}`);
         
         // Start pairing process in background
         startPairing(cleanNumber, pairingCode);
         
-        res.json({ success: true, pairingCode });
+        // Return the temp code - the actual WhatsApp code will come via websocket
+        res.json({ success: true, pairingCode, message: 'Check terminal for actual code' });
     } catch (error) {
         console.error('[Pairing] Error:', error);
         res.json({ success: false, error: 'Failed to generate pairing code' });
     }
+});
+
+// Get actual pairing code from WhatsApp
+app.get('/api/actual-code/:tempCode', (req, res) => {
+    const state = pairingStates.get(req.params.tempCode);
+    
+    if (!state) {
+        return res.json({ success: false, error: 'Invalid code' });
+    }
+    
+    res.json({ 
+        success: true, 
+        actualCode: state.actualCode,
+        status: state.status 
+    });
 });
 
 // Check pairing status
@@ -203,9 +225,31 @@ async function startPairing(phoneNumber, pairingCode) {
         const stateObj = pairingStates.get(pairingCode);
         if (stateObj) stateObj.sock = sock;
         
+        let pairingRequested = false;
+        
         // Connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
+            
+            console.log(`[Pairing ${pairingCode}] Connection update: ${connection || 'qr received'}`);
+            
+            // Request pairing code when QR event fires
+            if (qr && !sock.authState.creds.registered && !pairingRequested) {
+                console.log(`[Pairing ${pairingCode}] Requesting pairing code for: ${phoneNumber}`);
+                try {
+                    const code = await sock.requestPairingCode(phoneNumber);
+                    console.log(`[Pairing ${pairingCode}] Pairing code: ${code}`);
+                    pairingRequested = true;
+                    
+                    // Update the stored pairing code with actual code
+                    const stateObj = pairingStates.get(pairingCode);
+                    if (stateObj) {
+                        stateObj.actualCode = code;
+                    }
+                } catch (e) {
+                    console.error(`[Pairing ${pairingCode}] Error requesting code:`, e.message);
+                }
+            }
             
             if (connection === 'close') {
                 const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
@@ -255,16 +299,6 @@ async function startPairing(phoneNumber, pairingCode) {
         
         // Save credentials
         sock.ev.on('creds.update', saveCreds);
-        
-        // Request pairing code
-        setTimeout(async () => {
-            try {
-                const code = await sock.requestPairingCode(phoneNumber);
-                console.log(`[Pairing] Code requested: ${code}`);
-            } catch (e) {
-                console.error('[Pairing] Error requesting code:', e);
-            }
-        }, 3000);
         
     } catch (error) {
         console.error('[Pairing] Error:', error);
