@@ -4,11 +4,15 @@ echo "================================"
 echo "  LIGHT YAGAMI BOT - STARTING"
 echo "================================"
 
+export PATH="$(pwd)/bin:$PATH"
+
 # Install cloudflared if not present
 if ! command -v cloudflared &> /dev/null; then
     echo "[*] Installing cloudflared..."
-    curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
-    chmod +x /usr/local/bin/cloudflared
+    mkdir -p ./bin
+    curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o ./bin/cloudflared
+    chmod +x ./bin/cloudflared
+    export PATH="$(pwd)/bin:$PATH"
     echo "[+] cloudflared installed"
 fi
 
