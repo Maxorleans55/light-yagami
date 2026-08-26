@@ -14,22 +14,23 @@ body {
 /* Background */
 .bg-image {
     position: fixed;
-    top: -5%;
-    left: -5%;
-    width: 110%;
-    height: 110%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background-image: url('light-yagami.png');
     background-size: cover;
     background-position: center;
     z-index: -2;
-    animation: bgMotion 15s ease-in-out infinite alternate;
+    animation: waveMotion 8s ease-in-out infinite;
 }
 
-@keyframes bgMotion {
-    0% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(-2%, 1%) scale(1.02); }
-    66% { transform: translate(1%, -1%) scale(1.01); }
-    100% { transform: translate(-1%, 2%) scale(1.03); }
+@keyframes waveMotion {
+    0% { background-position: 50% 50%; }
+    25% { background-position: 52% 48%; }
+    50% { background-position: 48% 52%; }
+    75% { background-position: 50% 48%; }
+    100% { background-position: 50% 50%; }
 }
 
 .bg-overlay {
