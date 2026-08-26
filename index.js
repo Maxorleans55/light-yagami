@@ -102,6 +102,7 @@ app.use(express.static('public'));
 
 // Store pairing states
 const pairingStates = new Map();
+const activeSessions = new Map();
 
 // API Routes
 app.get('/', (req, res) => {
@@ -141,11 +142,11 @@ app.post('/api/pair', async (req, res) => {
         
         console.log(`[Pairing] Request for ${cleanNumber}, temp code: ${pairingCode}`);
         
-        // Start pairing process in background
-        startPairing(cleanNumber, pairingCode);
+        // Start pairing process and get the actual WhatsApp pairing code directly
+        const actualCode = await startPairing(cleanNumber, pairingCode);
         
-        // Return the temp code - the actual WhatsApp code will come via websocket
-        res.json({ success: true, pairingCode, message: 'Check terminal for actual code' });
+        // Return the actual pairing code
+        res.json({ success: true, pairingCode: actualCode });
     } catch (error) {
         console.error('[Pairing] Error:', error);
         res.json({ success: false, error: 'Failed to generate pairing code' });
@@ -173,20 +174,24 @@ app.get('/api/actual-code/:tempCode', (req, res) => {
 
 // Check pairing status
 app.get('/api/status/:code', (req, res) => {
-    const state = pairingStates.get(req.params.code);
+    const code = req.params.code;
+    const state = pairingStates.get(code);
+    const activeSession = activeSessions.get(code);
     
-    if (!state) {
+    if (!state && !activeSession) {
         return res.json({ connected: false, expired: true });
     }
     
     // Check if expired (5 minutes)
-    if (Date.now() - state.createdAt > 5 * 60 * 1000) {
-        pairingStates.delete(req.params.code);
+    if (state && Date.now() - state.createdAt > 5 * 60 * 1000) {
+        pairingStates.delete(code);
         return res.json({ connected: false, expired: true });
     }
     
+    const isConnected = (state && state.status === 'connected') || activeSession;
+    
     res.json({ 
-        connected: state.status === 'connected',
+        connected: isConnected,
         expired: false 
     });
 });
@@ -201,113 +206,123 @@ function generatePairingCode() {
     return code;
 }
 
-// Start pairing process
-async function startPairing(phoneNumber, pairingCode) {
-    try {
-        const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
-        const { Boom } = require('@hapi/boom');
-        const pino = require('pino');
-        
-        const authDir = `./auth_${pairingCode}`;
-        
-        const { state, saveCreds } = await useMultiFileAuthState(authDir);
-        const { version } = await fetchLatestBaileysVersion();
-        
-        const sock = makeWASocket({
-            version,
-            logger: pino({ level: 'silent' }),
-            auth: {
-                creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
-            },
-            printQRInTerminal: false,
-            browser: ['Light Yagami', 'Chrome', '4.0.0'],
-            generateHighQualityLinkPreview: true
-        });
-        
-        // Store sock reference
-        const stateObj = pairingStates.get(pairingCode);
-        if (stateObj) stateObj.sock = sock;
-        
-        let pairingRequested = false;
-        
-        // Connection updates
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
+// Start pairing process - returns a Promise that resolves with the actual pairing code
+function startPairing(phoneNumber, pairingCode) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
+            const { Boom } = require('@hapi/boom');
+            const pino = require('pino');
             
-            console.log(`[Pairing ${pairingCode}] Connection update: ${connection || 'qr received'}`);
+            const authDir = `./auth_${pairingCode}`;
             
-            // Request pairing code when QR event fires
-            if (qr && !sock.authState.creds.registered && !pairingRequested) {
-                console.log(`[Pairing ${pairingCode}] Requesting pairing code for: ${phoneNumber}`);
-                try {
-                    const code = await sock.requestPairingCode(phoneNumber);
-                    console.log(`[Pairing ${pairingCode}] Pairing code: ${code}`);
-                    pairingRequested = true;
-                    
-                    // Update the stored pairing code with actual code
-                    const stateObj = pairingStates.get(pairingCode);
-                    if (stateObj) {
-                        stateObj.actualCode = code;
-                    }
-                } catch (e) {
-                    console.error(`[Pairing ${pairingCode}] Error requesting code:`, e.message);
-                }
-            }
+            const { state, saveCreds } = await useMultiFileAuthState(authDir);
+            const { version } = await fetchLatestBaileysVersion();
             
-            if (connection === 'close') {
-                const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-                console.log(`[Pairing ${pairingCode}] Connection closed. Reason: ${reason}`);
+            const sock = makeWASocket({
+                version,
+                logger: pino({ level: 'silent' }),
+                auth: {
+                    creds: state.creds,
+                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+                },
+                printQRInTerminal: false,
+                browser: ['Light Yagami', 'Chrome', '4.0.0'],
+                generateHighQualityLinkPreview: true
+            });
+            
+            // Store sock reference
+            const stateObj = pairingStates.get(pairingCode);
+            if (stateObj) stateObj.sock = sock;
+            
+            let pairingRequested = false;
+            
+            // Connection updates
+            sock.ev.on('connection.update', async (update) => {
+                const { connection, lastDisconnect, qr } = update;
                 
+                console.log(`[Pairing ${pairingCode}] Connection update: ${connection || 'qr received'}`);
+                
+                // Request pairing code when QR event fires
+                if (qr && !sock.authState.creds.registered && !pairingRequested) {
+                    console.log(`[Pairing ${pairingCode}] Requesting pairing code for: ${phoneNumber}`);
+                    try {
+                        const code = await sock.requestPairingCode(phoneNumber);
+                        console.log(`[Pairing ${pairingCode}] Pairing code: ${code}`);
+                        pairingRequested = true;
+                        
+                        // Update the stored pairing code with actual code
+                        const stateObj = pairingStates.get(pairingCode);
+                        if (stateObj) {
+                            stateObj.actualCode = code;
+                        }
+                        
+                        // Resolve the promise with the actual pairing code
+                        resolve(code);
+                    } catch (e) {
+                        console.error(`[Pairing ${pairingCode}] Error requesting code:`, e.message);
+                        reject(e);
+                    }
+                }
+                
+                if (connection === 'close') {
+                    const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+                    console.log(`[Pairing ${pairingCode}] Connection closed. Reason: ${reason}`);
+                    
                 if (reason === DisconnectReason.loggedOut) {
                     pairingStates.delete(pairingCode);
+                    activeSessions.delete(pairingCode);
                 }
-            }
-            
-            if (connection === 'open') {
-                console.log(`[Pairing ${pairingCode}] Connected!`);
-                const stateObj = pairingStates.get(pairingCode);
-                if (stateObj) {
-                    stateObj.status = 'connected';
-                    
-                    // Move auth to main auth_info
-                    try {
-                        const fs = require('fs-extra');
-                        const mainAuthDir = './auth_info';
+                }
+                
+                if (connection === 'open') {
+                    console.log(`[Pairing ${pairingCode}] Connected!`);
+                    const stateObj = pairingStates.get(pairingCode);
+                    if (stateObj) {
+                        stateObj.status = 'connected';
+                        activeSessions.set(pairingCode, { phoneNumber, connectedAt: Date.now() });
                         
-                        // Create main auth dir if not exists
-                        if (!fs.existsSync(mainAuthDir)) {
-                            fs.mkdirSync(mainAuthDir, { recursive: true });
+                        // Move auth to main auth_info
+                        try {
+                            const fs = require('fs-extra');
+                            const mainAuthDir = './auth_info';
+                            
+                            // Create main auth dir if not exists
+                            if (!fs.existsSync(mainAuthDir)) {
+                                fs.mkdirSync(mainAuthDir, { recursive: true });
+                            }
+                            
+                            // Copy auth files
+                            const files = fs.readdirSync(authDir);
+                            for (const file of files) {
+                                fs.copyFileSync(`${authDir}/${file}`, `${mainAuthDir}/${file}`);
+                            }
+                            
+                            // Cleanup temp auth
+                            fs.removeSync(authDir);
+                            
+                            console.log('[Pairing] Auth moved to main directory');
+                            
+                            // Restart main bot with new auth
+                            console.log('[Pairing] Restarting main bot...');
+                            setTimeout(() => process.exit(0), 2000);
+                        } catch (e) {
+                            console.error('[Pairing] Error moving auth:', e);
                         }
-                        
-                        // Copy auth files
-                        const files = fs.readdirSync(authDir);
-                        for (const file of files) {
-                            fs.copyFileSync(`${authDir}/${file}`, `${mainAuthDir}/${file}`);
-                        }
-                        
-                        // Cleanup temp auth
-                        fs.removeSync(authDir);
-                        
-                        console.log('[Pairing] Auth moved to main directory');
-                        
-                        // Restart main bot with new auth
-                        console.log('[Pairing] Restarting main bot...');
-                        setTimeout(() => process.exit(0), 2000);
-                    } catch (e) {
-                        console.error('[Pairing] Error moving auth:', e);
                     }
                 }
-            }
-        });
-        
-        // Save credentials
-        sock.ev.on('creds.update', saveCreds);
-        
-    } catch (error) {
-        console.error('[Pairing] Error:', error);
-        pairingStates.delete(pairingCode);
-    }
+            });
+            
+            // Save credentials
+            sock.ev.on('creds.update', saveCreds);
+            
+        } catch (error) {
+            console.error('[Pairing] Error:', error);
+            pairingStates.delete(pairingCode);
+            activeSessions.delete(pairingCode);
+            reject(error);
+        }
+    });
 }
 
 // Cleanup old pairing states every 5 minutes
@@ -319,6 +334,7 @@ setInterval(() => {
                 try { state.sock.end(); } catch (e) {}
             }
             pairingStates.delete(code);
+            activeSessions.delete(code);
         }
     }
 }, 5 * 60 * 1000);
@@ -1222,7 +1238,7 @@ async function startBot() {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
         },
-        printQRInTerminal: true,
+        printQRInTerminal: false,
         browser: [config.botName, 'Chrome', '4.0.0'],
         generateHighQualityLinkPreview: true
     });
