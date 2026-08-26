@@ -137,14 +137,16 @@ app.post('/api/pair', async (req, res) => {
         // Check if main bot is registered (has auth)
         if (mainSock.authState?.creds?.registered) {
             console.log(`[Pairing] Bot is already registered. Pairing code can only be used to link NEW devices.`);
-            console.log(`[Pairing] This bot is already connected. Other users cannot pair - the owner's session is active.`);
+            return res.json({ success: false, error: 'Bot is already connected. Pairing only works for new devices.' });
         }
         
         console.log(`[Pairing] Requesting pairing code for: ${cleanNumber}`);
         
-        // Request pairing code directly from main socket
-        // The fixed Baileys handles browser normalization internally
-        const code = await mainSock.requestPairingCode(cleanNumber);
+        // Request pairing code with timeout
+        const code = await Promise.race([
+            mainSock.requestPairingCode(cleanNumber),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Pairing code request timed out')), 30000))
+        ]);
         console.log(`[Pairing] Pairing code generated: ${code}`);
         
         // Store pairing state
