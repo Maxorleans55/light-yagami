@@ -129,3 +129,39 @@ document.getElementById('phoneNumber').addEventListener('keypress', function(e) 
         requestPairing();
     }
 });
+
+// Letter-by-letter text animation
+function createLetters(elementId, text) {
+    const el = document.getElementById(elementId);
+    el.innerHTML = '';
+    text.split('').forEach((char, i) => {
+        const span = document.createElement('span');
+        span.className = 'letter';
+        span.textContent = char === ' ' ? '\u00A0' : char;
+        span.style.animationDelay = `${i * 0.1}s`;
+        el.appendChild(span);
+    });
+}
+
+function hideLetters(elementId, text) {
+    const el = document.getElementById(elementId);
+    const letters = el.querySelectorAll('.letter');
+    letters.forEach((span, i) => {
+        span.classList.add('hide');
+        span.style.animationDelay = `${i * 0.05}s`;
+    });
+}
+
+function loopTextAnimation() {
+    createLetters('textLight', 'LIGHT');
+    createLetters('textYagami', 'YAGAMI');
+
+    setTimeout(() => {
+        hideLetters('textLight', 'LIGHT');
+        hideLetters('textYagami', 'YAGAMI');
+    }, 3000);
+
+    setTimeout(loopTextAnimation, 4500);
+}
+
+loopTextAnimation();
