@@ -724,3 +724,83 @@ body {
     background: rgba(192, 57, 43, 0.4);
     color: #fff;
 }
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tab {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.tab:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.tab.active {
+    background: rgba(192, 57, 43, 0.2);
+    color: #c0392b;
+    border: 1px solid rgba(192, 57, 43, 0.3);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* QR Container */
+.qr-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    min-height: 280px;
+}
+
+.qr-container img {
+    max-width: 256px;
+    border-radius: 8px;
+}
+
+.qr-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 14px;
+}
+
+.qr-loading .loader {
+    border-color: rgba(0, 0, 0, 0.2);
+    border-top-color: #c0392b;
+}

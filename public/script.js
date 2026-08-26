@@ -47,6 +47,56 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Tab switching
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    
+    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById(`tab-${tab}`).classList.add('active');
+}
+
+// QR Code polling
+let qrInterval = null;
+
+async function fetchQR() {
+    try {
+        const res = await fetch('/api/qr');
+        const data = await res.json();
+        
+        const container = document.getElementById('qrContainer');
+        const status = document.getElementById('qrStatus');
+        
+        if (data.connected) {
+            container.innerHTML = '<div style="text-align:center;color:#2ecc71;font-size:18px;font-weight:600;">Bot is Connected!</div>';
+            status.innerHTML = '<span class="status-dot" style="background:#2ecc71"></span><span>Device linked successfully</span>';
+            if (qrInterval) clearInterval(qrInterval);
+            return;
+        }
+        
+        if (data.qr) {
+            container.innerHTML = `<img src="${data.qr}" alt="QR Code">`;
+            status.innerHTML = '<span class="status-dot"></span><span>Scan with WhatsApp</span>';
+        } else {
+            container.innerHTML = '<div class="qr-loading"><div class="loader"></div><span>Generating QR code...</span></div>';
+        }
+    } catch (e) {
+        console.log('QR fetch error:', e);
+    }
+}
+
+// Start QR polling when QR tab is active
+function startQRPolling() {
+    fetchQR();
+    if (qrInterval) clearInterval(qrInterval);
+    qrInterval = setInterval(fetchQR, 3000);
+}
+
+// Auto-start QR polling
+document.addEventListener('DOMContentLoaded', () => {
+    startQRPolling();
+});
+
 // Request pairing code
 async function requestPairing() {
     const countryCode = document.getElementById('countryCode').value;

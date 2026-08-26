@@ -36,28 +36,56 @@
             <p class="tagline">JUSTICE IS WRITTEN BY ME</p>
         </div>
 
-        <!-- Steps -->
-        <div class="steps">
-            <div class="step active" id="step1">
-                <div class="step-number">1</div>
-                <span>Enter Phone</span>
-            </div>
-            <div class="step-line"></div>
-            <div class="step" id="step2">
-                <div class="step-number">2</div>
-                <span>Get Code</span>
-            </div>
-            <div class="step-line"></div>
-            <div class="step" id="step3">
-                <div class="step-number">3</div>
-                <span>Link Device</span>
+        <!-- Connection Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="qr" onclick="switchTab('qr')">QR Code</button>
+            <button class="tab" data-tab="phone" onclick="switchTab('phone')">Phone Pairing</button>
+        </div>
+
+        <!-- QR Tab -->
+        <div class="tab-content active" id="tab-qr">
+            <div class="card" id="qrCard">
+                <h2>Scan QR Code</h2>
+                <p class="card-desc">Open WhatsApp → Settings → Linked Devices → Link a Device</p>
+                
+                <div class="qr-container" id="qrContainer">
+                    <div class="qr-loading">
+                        <div class="loader"></div>
+                        <span>Generating QR code...</span>
+                    </div>
+                </div>
+                
+                <div class="status" id="qrStatus">
+                    <span class="status-dot"></span>
+                    <span>Waiting for scan...</span>
+                </div>
             </div>
         </div>
 
-        <!-- Phone Input Card -->
-        <div class="card" id="phoneCard">
-            <h2>Enter Your Phone Number</h2>
-            <p class="card-desc">Enter your WhatsApp phone number with country code</p>
+        <!-- Phone Pairing Tab -->
+        <div class="tab-content" id="tab-phone">
+            <!-- Steps -->
+            <div class="steps">
+                <div class="step active" id="step1">
+                    <div class="step-number">1</div>
+                    <span>Enter Phone</span>
+                </div>
+                <div class="step-line"></div>
+                <div class="step" id="step2">
+                    <div class="step-number">2</div>
+                    <span>Get Code</span>
+                </div>
+                <div class="step-line"></div>
+                <div class="step" id="step3">
+                    <div class="step-number">3</div>
+                    <span>Link Device</span>
+                </div>
+            </div>
+
+            <!-- Phone Input Card -->
+            <div class="card" id="phoneCard">
+                <h2>Enter Phone Number</h2>
+                <p class="card-desc">Only works when bot has no existing session</p>
             
             <div class="phone-input-group">
                 <div class="country-select">
@@ -199,6 +227,7 @@
             </div>
             
             <button class="btn-primary" onclick="location.reload()">Connect Another Device</button>
+        </div>
         </div>
 
         <!-- Footer -->

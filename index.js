@@ -14,6 +14,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
 const express = require('express');
 const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const fs = require('fs-extra');
 const path = require('path');
 const moment = require('moment-timezone');
@@ -105,10 +106,24 @@ const pairingStates = new Map();
 const activeSessions = new Map();
 let mainSock = null;
 let mainSaveCreds = null;
+let currentQR = null;
 
 // API Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// QR Code endpoint
+app.get('/api/qr', async (req, res) => {
+    if (!currentQR) {
+        return res.json({ qr: null, connected: !!mainSock?.user });
+    }
+    try {
+        const qrDataUrl = await QRCode.toDataURL(currentQR, { width: 256, margin: 2 });
+        res.json({ qr: qrDataUrl, connected: false });
+    } catch (e) {
+        res.json({ qr: null, error: 'Failed to generate QR' });
+    }
 });
 
 app.get('/status', (req, res) => res.json({ status: 'online', bot: config.botName }));
@@ -1144,6 +1159,7 @@ async function startBot() {
         if (qr) {
             console.log('\n📱 Scan QR Code below:\n');
             qrcode.generate(qr, { small: true });
+            currentQR = qr;
         }
         
         // After pairing success, WA sends 515 (restartRequired) - this is EXPECTED
@@ -1169,6 +1185,7 @@ async function startBot() {
         }
         
         if (connection === 'open') {
+            currentQR = null;
             console.log(`\n✅ ${config.botName} Bot is Online!\n`);
             console.log(`Bot is ready to receive commands.`);
         }
