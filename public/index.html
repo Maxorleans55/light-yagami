@@ -5,14 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Light Yagami Bot - Connect</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Background Image -->
+    <div class="bg-image"></div>
+    <div class="bg-overlay"></div>
+    
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <div class="bot-avatar">📓</div>
-            <h1>Light Yagami</h1>
-            <p>WhatsApp Bot - Connect Your Device</p>
+            <div class="logo-mark">L</div>
+            <h1 class="title">
+                <span class="title-light">LIGHT</span>
+                <span class="title-yagami">YAGAMI</span>
+            </h1>
+            <p class="tagline">JUSTICE IS WRITTEN BY ME</p>
         </div>
 
         <!-- Steps -->
@@ -35,7 +43,7 @@
 
         <!-- Phone Input Card -->
         <div class="card" id="phoneCard">
-            <h2>📱 Enter Your Phone Number</h2>
+            <h2>Enter Your Phone Number</h2>
             <p class="card-desc">Enter your WhatsApp phone number with country code</p>
             
             <div class="phone-input-group">
@@ -128,7 +136,7 @@
 
         <!-- Pairing Code Card -->
         <div class="card hidden" id="pairingCard">
-            <h2>🔑 Your Pairing Code</h2>
+            <h2>Your Pairing Code</h2>
             <p class="card-desc">Enter this code in WhatsApp to link your device</p>
             
             <div class="pairing-code" id="pairingCode">---</div>
@@ -154,7 +162,7 @@
 
         <!-- Success Card -->
         <div class="card hidden" id="successCard">
-            <div class="success-icon">✅</div>
+            <div class="success-icon">⚡</div>
             <h2>Device Connected!</h2>
             <p class="card-desc">Your device is now linked to the bot</p>
             
