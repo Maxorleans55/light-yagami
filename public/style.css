@@ -96,6 +96,48 @@ body {
     margin-top: 12px;
 }
 
+/* Death Note Feature */
+.deathnote-section {
+    margin-bottom: 30px;
+}
+
+.deathnote-card {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.deathnote-img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.5s ease;
+}
+
+.deathnote-card:hover .deathnote-img {
+    transform: scale(1.05);
+}
+
+.deathnote-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 40px 20px 16px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+}
+
+.deathnote-text {
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+}
+
 /* Steps */
 .steps {
     display: flex;
