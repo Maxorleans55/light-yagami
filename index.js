@@ -156,9 +156,13 @@ app.post('/api/pair', async (req, res) => {
 app.get('/api/actual-code/:tempCode', (req, res) => {
     const state = pairingStates.get(req.params.tempCode);
     
+    console.log(`[API] Actual code request for: ${req.params.tempCode}, state:`, state ? 'found' : 'not found');
+    
     if (!state) {
         return res.json({ success: false, error: 'Invalid code' });
     }
+    
+    console.log(`[API] Actual code: ${state.actualCode}, status: ${state.status}`);
     
     res.json({ 
         success: true, 

@@ -67,7 +67,7 @@ async function pollForActualCode(tempCode) {
     if (pollInterval) clearInterval(pollInterval);
     
     let attempts = 0;
-    const maxAttempts = 30; // 30 seconds
+    const maxAttempts = 60; // 60 seconds
     
     pollInterval = setInterval(async () => {
         attempts++;
@@ -81,6 +81,8 @@ async function pollForActualCode(tempCode) {
         try {
             const response = await fetch(`/api/actual-code/${tempCode}`);
             const data = await response.json();
+            
+            console.log('Poll result:', data); // Debug
             
             if (data.success && data.actualCode) {
                 clearInterval(pollInterval);
@@ -99,7 +101,7 @@ async function pollForActualCode(tempCode) {
                 showSuccess();
             }
         } catch (error) {
-            console.log('Polling...', attempts);
+            console.log('Polling attempt', attempts, error);
         }
     }, 1000);
 }
