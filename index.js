@@ -98,7 +98,7 @@ if (!fs.existsSync(VIEW_ONCE_DIR)) {
 // ============================================
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Store pairing states
 const pairingStates = new Map();
