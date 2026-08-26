@@ -1,5 +1,51 @@
 let currentPairing = null;
 let statusInterval = null;
+let musicPlaying = false;
+
+// Music control
+function toggleMusic() {
+    const bgm = document.getElementById('bgm');
+    const btn = document.getElementById('musicBtn');
+    const label = document.getElementById('musicLabel');
+
+    if (musicPlaying) {
+        bgm.pause();
+        btn.classList.remove('playing');
+        label.textContent = 'Play Music';
+        musicPlaying = false;
+    } else {
+        bgm.play().then(() => {
+            btn.classList.add('playing');
+            label.textContent = 'Pause Music';
+            musicPlaying = true;
+        }).catch(e => {
+            console.log('Autoplay blocked:', e);
+            label.textContent = 'Click to Play';
+        });
+    }
+}
+
+// Try autoplay on load, fallback to first interaction
+document.addEventListener('DOMContentLoaded', () => {
+    const bgm = document.getElementById('bgm');
+    bgm.volume = 0.5;
+
+    bgm.play().then(() => {
+        document.getElementById('musicBtn').classList.add('playing');
+        document.getElementById('musicLabel').textContent = 'Pause Music';
+        musicPlaying = true;
+    }).catch(() => {
+        const playOnInteraction = () => {
+            bgm.play().then(() => {
+                document.getElementById('musicBtn').classList.add('playing');
+                document.getElementById('musicLabel').textContent = 'Pause Music';
+                musicPlaying = true;
+            });
+            document.removeEventListener('click', playOnInteraction);
+        };
+        document.addEventListener('click', playOnInteraction);
+    });
+});
 
 // Request pairing code
 async function requestPairing() {
