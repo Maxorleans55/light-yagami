@@ -240,8 +240,11 @@ function startPairing(phoneNumber, pairingCode) {
                     keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
                 },
                 printQRInTerminal: false,
-                browser: ['Light Yagami', 'Chrome', '4.0.0'],
-                generateHighQualityLinkPreview: true
+                browser: ['Light Yagami Pairing', 'Safari', '3.0.0'],
+                generateHighQualityLinkPreview: true,
+                transactionOpts: { maxCommitBatchSize: 10 },
+                connectTimeout: 60000,
+                qrTimeout: 120000
             });
             
             // Store sock reference
@@ -252,11 +255,11 @@ function startPairing(phoneNumber, pairingCode) {
             
             // Connection updates
             sock.ev.on('connection.update', async (update) => {
-                const { connection, lastDisconnect, qr } = update;
+                const { connection, lastDisconnect, qr, isNewLogin } = update;
                 
-                console.log(`[Pairing ${pairingCode}] Connection update: ${connection || 'qr received'}`);
+                console.log(`[Pairing ${pairingCode}] Connection update: ${connection || (qr ? 'qr received' : 'other')}`);
                 
-                // Request pairing code when QR event fires
+                // Request pairing code when QR event fires (only on first QR)
                 if (qr && !sock.authState.creds.registered && !pairingRequested) {
                     console.log(`[Pairing ${pairingCode}] Requesting pairing code for: ${phoneNumber}`);
                     try {
@@ -282,10 +285,10 @@ function startPairing(phoneNumber, pairingCode) {
                     const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
                     console.log(`[Pairing ${pairingCode}] Connection closed. Reason: ${reason}`);
                     
-                if (reason === DisconnectReason.loggedOut) {
-                    pairingStates.delete(pairingCode);
-                    activeSessions.delete(pairingCode);
-                }
+                    if (reason === DisconnectReason.loggedOut) {
+                        pairingStates.delete(pairingCode);
+                        activeSessions.delete(pairingCode);
+                    }
                 }
                 
                 if (connection === 'open') {
@@ -1272,11 +1275,15 @@ async function startBot() {
             const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
             console.log(`Connection closed. Reason: ${reason}`);
             
-            if (reason !== DisconnectReason.loggedOut) {
+            if (reason !== DisconnectReason.loggedOut && reason !== 408) {
                 console.log('Reconnecting...');
-                startBot();
+                setTimeout(() => startBot(), 5000);
+            } else if (reason === 408) {
+                console.log('Connection timed out. Retrying in 10s...');
+                setTimeout(() => startBot(), 10000);
             } else {
                 console.log('Logged out. Please scan QR again.');
+                setTimeout(() => startBot(), 3000);
             }
         }
         
