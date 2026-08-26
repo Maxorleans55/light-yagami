@@ -22,15 +22,16 @@ body {
     background-size: cover;
     background-position: center;
     z-index: -2;
-    animation: waveMotion 8s ease-in-out infinite;
+    animation: aliveBg 20s ease-in-out infinite;
 }
 
-@keyframes waveMotion {
-    0% { background-position: 50% 50%; }
-    25% { background-position: 52% 48%; }
-    50% { background-position: 48% 52%; }
-    75% { background-position: 50% 48%; }
-    100% { background-position: 50% 50%; }
+@keyframes aliveBg {
+    0% { transform: scale(1) translate(0, 0); }
+    20% { transform: scale(1.05) translate(-1%, 1%); }
+    40% { transform: scale(1.02) translate(1%, -0.5%); }
+    60% { transform: scale(1.06) translate(-0.5%, -1%); }
+    80% { transform: scale(1.03) translate(0.5%, 0.5%); }
+    100% { transform: scale(1) translate(0, 0); }
 }
 
 .bg-overlay {
